@@ -1,0 +1,338 @@
+/* Design Tokens from DESIGN.md - MongoDB-inspired */
+
+:root {
+  /* Colors - Brand & Accent */
+  --color-primary: #00ed64;
+  --color-primary-deep: #00b545;
+  --color-primary-pressed: #008c34;
+  --color-on-primary: #001e2b;
+  --color-brand-green: #00ed64;
+  --color-brand-green-dark: #00684a;
+  --color-brand-green-mid: #00a35c;
+  --color-brand-green-soft: #c3f0d2;
+  --color-brand-teal-deep: #001e2b;
+  --color-brand-teal: #003d4f;
+  --color-brand-teal-mid: #00684a;
+  --color-accent-purple: #7b3ff2;
+  --color-accent-orange: #fa6e39;
+  --color-accent-pink: #f06bb8;
+  --color-accent-blue: #3d4f9f;
+
+  /* Colors - Surface */
+  --color-canvas: #ffffff;
+  --color-canvas-dark: #001e2b;
+  --color-surface: #f9fbfa;
+  --color-surface-soft: #f4f7f6;
+  --color-surface-feature: #e3fcef;
+
+  /* Colors - Hairline */
+  --color-hairline: #e1e5e8;
+  --color-hairline-soft: #eceff1;
+  --color-hairline-strong: #c1ccd6;
+  --color-hairline-dark: #1c2d38;
+
+  /* Colors - Text */
+  --color-ink: #001e2b;
+  --color-charcoal: #1c2d38;
+  --color-slate: #3d4f5b;
+  --color-steel: #5c6c7a;
+  --color-stone: #7c8c9a;
+  --color-muted: #a8b3bc;
+  --color-on-dark: #ffffff;
+  --color-on-dark-muted: #a8b3bc;
+
+  /* Rounded */
+  --rounded-xs: 4px;
+  --rounded-sm: 6px;
+  --rounded-md: 8px;
+  --rounded-lg: 12px;
+  --rounded-xl: 16px;
+  --rounded-xxl: 24px;
+  --rounded-full: 9999px;
+
+  /* Spacing */
+  --spacing-xxs: 4px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 20px;
+  --spacing-xl: 24px;
+  --spacing-xxl: 32px;
+  --spacing-xxxl: 40px;
+
+  /* Typography */
+  --font-family: 'Euclid Circular A', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-code: 'Source Code Pro', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Font Sizes */
+  --text-hero-display: 72px;
+  --text-display-lg: 56px;
+  --text-heading-1: 48px;
+  --text-heading-2: 36px;
+  --text-heading-3: 28px;
+  --text-heading-4: 22px;
+  --text-heading-5: 18px;
+  --text-subtitle: 18px;
+  --text-body-md: 16px;
+  --text-body-sm: 14px;
+  --text-caption: 13px;
+  --text-micro: 12px;
+  --text-button: 14px;
+}
+
+/* Global Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  font-family: var(--font-family);
+  font-size: var(--text-body-md);
+  line-height: 1.55;
+  color: var(--color-ink);
+  background-color: var(--color-canvas);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Button Base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family);
+  font-size: var(--text-button);
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 10px 22px;
+  border-radius: var(--rounded-full);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background-color: var(--color-brand-green);
+  color: var(--color-on-primary);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-deep);
+}
+
+.btn-primary:disabled {
+  background-color: var(--color-hairline);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-hairline-strong);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-charcoal);
+}
+
+/* Input Base */
+.input {
+  width: 100%;
+  height: 44px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: var(--font-family);
+  font-size: var(--text-body-md);
+  color: var(--color-ink);
+  background-color: var(--color-canvas);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--rounded-md);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input:focus {
+  border-color: var(--color-brand-green-dark);
+  border-width: 2px;
+}
+
+.input::placeholder {
+  color: var(--color-muted);
+}
+
+/* Card Base */
+.card {
+  background-color: var(--color-canvas);
+  border-radius: var(--rounded-lg);
+  padding: var(--spacing-xl);
+  border: 1px solid var(--color-hairline);
+}
+
+/* Container */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-xl);
+}
+
+/* Headings */
+h1 {
+  font-size: var(--text-heading-1);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+h2 {
+  font-size: var(--text-heading-2);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+}
+
+h3 {
+  font-size: var(--text-heading-3);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+h4 {
+  font-size: var(--text-heading-4);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: var(--color-steel);
+}
+
+.mt-1 { margin-top: var(--spacing-xs); }
+.mt-2 { margin-top: var(--spacing-sm); }
+.mt-3 { margin-top: var(--spacing-md); }
+.mt-4 { margin-top: var(--spacing-lg); }
+.mt-5 { margin-top: var(--spacing-xl); }
+
+.mb-1 { margin-bottom: var(--spacing-xs); }
+.mb-2 { margin-bottom: var(--spacing-sm); }
+.mb-3 { margin-bottom: var(--spacing-md); }
+.mb-4 { margin-bottom: var(--spacing-lg); }
+.mb-5 { margin-bottom: var(--spacing-xl); }
+
+/* Spinner */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--color-hairline);
+  border-top-color: var(--color-brand-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Email Body Styles */
+.email-body p {
+  margin-bottom: 16px;
+  line-height: 1.7;
+}
+
+.email-body ul {
+  margin-bottom: 16px;
+  padding-left: 24px;
+  list-style-type: disc;
+}
+
+.email-body ul li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.email-body strong {
+  color: #00ed64;
+  font-weight: 600;
+}
+
+.email-body a {
+  color: #00ed64;
+  text-decoration: underline;
+}
+
+.email-body br {
+  display: block;
+  margin-top: 8px;
+  content: '';
+}
+
+/* Summernote Editor Dark Theme */
+.summernote-editor .note-editor {
+  background: #0d1f2b !important;
+  border: 1px solid #1c2d38 !important;
+  border-radius: 8px !important;
+}
+
+.summernote-editor .note-editor .note-editable {
+  background: #0d1f2b !important;
+  color: #e0e0e0 !important;
+  font-family: system-ui, -apple-system, sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  padding: 12px !important;
+  min-height: 300px !important;
+}
+
+.summernote-editor .note-editor .note-toolbar {
+  background: #1c2d38 !important;
+  border-bottom: 1px solid #2a3f4f !important;
+  padding: 8px !important;
+}
+
+.summernote-editor .note-editor .note-toolbar .btn {
+  color: #a8b3bc !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.summernote-editor .note-editor .note-toolbar .btn:hover {
+  color: #00ed64 !important;
+  background: rgba(0, 237, 100, 0.1) !important;
+}
+
+.summernote-editor .note-editor .note-toolbar .note-btn-group .dropdown-menu {
+  background: #1c2d38 !important;
+  border: 1px solid #2a3f4f !important;
+}
+
+.summernote-editor .note-editor .note-toolbar .dropdown-menu a {
+  color: #e0e0e0 !important;
+}
+
+.summernote-editor .note-editor .note-toolbar .dropdown-menu a:hover {
+  background: #0d1f2b !important;
+  color: #00ed64 !important;
+}
+
+.summernote-editor .note-editor .note-statusbar {
+  display: none !important;
+}
+
+/* Email Preview - Hide Empty Bullets */
+.email-body ul li:empty,
+.email-body ol li:empty {
+  display: none !important;
+}
+
+.email-body ul:empty,
+.email-body ol:empty {
+  display: none !important;
+}

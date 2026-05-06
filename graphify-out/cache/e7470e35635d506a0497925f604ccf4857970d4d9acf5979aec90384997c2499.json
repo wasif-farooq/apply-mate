@@ -1,0 +1,1 @@
+{"nodes": [{"id": "db_database", "label": "Database Connection", "file_type": "code", "source_file": "backend/src/db/database.py", "source_location": null}], "edges": [{"source": "db_database", "target": "db_models", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "backend/src/db/database.py", "source_location": 24}], "hyperedges": []}
