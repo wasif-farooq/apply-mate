@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-from src.logger import logger
+from utils.logger import logger
 
 
 def fetch_linkedin_post(url: str) -> dict:
