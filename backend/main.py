@@ -301,7 +301,6 @@ class ApplyResponse(BaseModel):
     body: str
     status: str
     total_experience_years: str = None
-    relevant_experience_years: str = None
 
 
 class SendRequest(BaseModel):
@@ -420,7 +419,6 @@ def apply_to_job(
             subject = email_content.get('subject', f"Application for {title}")
             body = email_content.get('body', '')
             extracted_email = email_content.get('email')  # Email extracted by AI from job post
-            relevant_exp = email_content.get('relevant_experience_years', '0')
             
             # Get total experience from parsed resume (fallback to "0" if not available)
             total_exp = resume_parsed.get('total_experience_years', '0') if resume_parsed else "0"
@@ -464,8 +462,7 @@ Thank you for considering my application. I hope to hear from you soon.
 Best regards,
 {candidate_name}"""
             
-            # Fallback: use total experience from resume as relevant (fallback to "0")
-            relevant_exp = resume_parsed.get('total_experience_years', '0') if resume_parsed else "0"
+            # Fallback: use total experience from resume (fallback to "0")
             total_exp = resume_parsed.get('total_experience_years', '0') if resume_parsed else "0"
 
         if not email:
@@ -482,8 +479,7 @@ Best regards,
             subject=subject,
             body=body,
             status="generated",
-            total_experience_years=total_exp,
-            relevant_experience_years=relevant_exp
+            total_experience_years=total_exp
         )
 
     except Exception as e:

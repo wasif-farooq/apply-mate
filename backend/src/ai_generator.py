@@ -268,7 +268,7 @@ def generate_email_content(
 Candidate's Resume:
 - Name: {resume_data.get('name', candidate_name or 'Candidate')}
 - Experience: {experience_years} years
-- Skills (EXACT): {', '.join(skills[:15]) if skills else 'Not specified'}
+- Skills: {', '.join(skills[:15]) if skills else 'Not specified'}
 - Key Achievements: {', '.join(key_achievements[:5]) if key_achievements else 'Not specified'}
 - Certifications: {', '.join(certifications[:3]) if certifications else 'None'}
 - Latest Role: {latest_role} at {latest_company}
@@ -303,11 +303,7 @@ Candidate's Resume:
    - Return ONLY the valid email format: user@domain.com
    - If no valid email found, return null.
 2. **subject**: A professional job application email subject line (max 60 characters).
-3. **relevant_experience_years**: Calculate years of experience RELEVANT to this job.
-   - Compare the job requirements with candidate's work history in the resume.
-   - Only count experience where skills/role match the job requirements.
-   - Return a number as string (e.g., "6") or "0" if no relevant experience found.
-4. **body**: A professional job application email body in HTML format (150-200 words).
+3. **body**: A professional job application email body in HTML format (150-200 words).
 
 Job Details:
 - Position: [{clean_job_title}]({job_url})
@@ -322,11 +318,10 @@ Resume/CV:
 
 Candidate: {candidate_name}
 
-Return ONLY valid JSON with exactly these 4 fields:
+Return ONLY valid JSON with exactly these 3 fields:
 {{
   "email": "extracted@email.com" or null,
   "subject": "Application for [Position] at [Company] - [Name]",
-  "relevant_experience_years": "6",
   "body": "<p>Dear Hiring Manager,</p>...<p>Best regards,<br/>[Name]</p>"
 }}
 
@@ -334,10 +329,11 @@ CRITICAL RULES FOR BODY:
 - Use <p> tags for paragraphs, <ul>/<li> for lists, <strong> for bold, <br/> for line breaks
 - Include the position as a clickable link: <a href="{job_url}">{clean_job_title}</a>
 - FIRST LINE MUST BE: <p>Dear Hiring Manager,</p> (nothing else before)
-- In the opening paragraph, mention the RELEVANT years of experience, not total. Format: "With [X] years of relevant experience in [domain], I'm confident..."
+- In the opening paragraph, mention years of experience from resume (use total experience from resume, not job requirements)
 - Map EXACT skills from resume to job requirements
 - Include 1-2 quantified achievements from resume (e.g., "40% faster", "5-person team")
 - Include paragraph about AI tools integration
+- Do NOT include emojis or special characters
 - Return ONLY the JSON - no markdown, no explanations"""
 
     logger.debug(f"[AI Content] Combined prompt:\n{prompt}")
@@ -356,26 +352,32 @@ CRITICAL RULES FOR BODY:
         subject = content.get('subject', f"Application for {clean_job_title}").strip()
         body = content.get('body', '').strip()
         email = content.get('email')
-        relevant_exp = content.get('relevant_experience_years', '0')
         
         # Clean email - extract only valid email address (remove any prefix like "on", "at", etc.)
         if email:
-            email_clean = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', str(email))
+            # Use negative lookbehind to ensure no word character immediately before email
+            # This prevents matching "onmgupta" as the username
+            email_clean = re.search(r'(?<!\w)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', str(email))
             if email_clean:
                 email = email_clean.group()
                 logger.debug(f"[AI Content] Cleaned email: {email}")
             else:
-                email = None
+                # Fallback: try to find email after common prefixes
+                email_fallback = re.search(r'(?:on|at|email:|contact:)\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', str(email), re.IGNORECASE)
+                if email_fallback:
+                    email = email_fallback.group(1)
+                    logger.debug(f"[AI Content] Cleaned email (fallback): {email}")
+                else:
+                    email = None
         
         # Clean body
         body = clean_email_body(body)
         
-        logger.info(f"[AI Content] Generated - subject: {subject[:50]}..., email found: {bool(email)}, relevant exp: {relevant_exp} years")
+        logger.info(f"[AI Content] Generated - subject: {subject[:50]}..., email found: {bool(email)}")
         return {
             'subject': subject,
             'body': body,
-            'email': email,
-            'relevant_experience_years': relevant_exp
+            'email': email
         }
     except json.JSONDecodeError as e:
         logger.error(f"[AI Content] JSON parse failed: {e}, response: {result}")
