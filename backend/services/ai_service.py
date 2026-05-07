@@ -90,7 +90,7 @@ class LLMService:
 class ResumeParser:
     PROMPT = """You are an expert resume parser. Analyze the resume below and extract structured information.
 
-Return ONLY valid JSON - no markdown, no explanations.
+Return ONLY valid JSON - no markdown, no explanations, no text before or after.
 
 {
   "name": "Full name of candidate",
@@ -99,19 +99,36 @@ Return ONLY valid JSON - no markdown, no explanations.
   "location": "City, State/Country",
   "summary": "2-3 sentence professional summary",
   "total_experience_years": "Number as string (e.g., '5' or '5+')",
-  "skills": ["Python", "AWS", "Docker"],
-  "education": [{"degree": "Degree type", "institution": "University", "year": "Year"}],
-  "experience": [{"company": "Company", "position": "Title", "duration": "Start - End", "description": "Key responsibilities", "achievements": ["Achievement 1"]}],
-  "key_achievements": ["Quantified achievement"],
-  "certifications": ["Certification"],
-  "languages": ["Language"]
+  "skills": ["Python", "AWS", "Docker", "React", "PostgreSQL"],
+  "education": [
+    {
+      "degree": "Degree type and field (e.g., B.S. Computer Science)",
+      "institution": "University name",
+      "year": "Graduation year"
+    }
+  ],
+  "experience": [
+    {
+      "company": "Company name",
+      "position": "Job title",
+      "duration": "Start - End (e.g., 2020 - Present)",
+      "description": "Key responsibilities and achievements",
+      "achievements": ["Reduced latency by 40%", "Led team of 5", "$50K budget managed"]
+    }
+  ],
+  "key_achievements": ["Increased sales 30%", "Reduced CI/CD time by 50%", "99.9% uptime achieved"],
+  "certifications": ["AWS Solutions Architect", "PMP"],
+  "languages": ["English (Native)", "Spanish (Fluent)"]
 }
 
 Rules:
-- If a field is missing, use empty string or empty array []
-- Return ONLY the JSON
-- Calculate total_experience_years from work history
-- EXTRACT QUANTIFIABLE ACHIEVEMENTS (%, $, team sizes)
+- If a field is missing or unclear, use empty string or empty array []
+- Return ONLY the JSON - no preamble, no postamble
+- Be precise: extract actual skills from the resume, don't guess
+- Calculate total_experience_years from work history dates if available
+- Include only technical/professional skills (not soft skills)
+- EXTRACT QUANTIFIABLE ACHIEVEMENTS: Look for percentages (%, %), dollar amounts ($), team sizes, performance metrics, time reductions, efficiency gains
+- Extract achievements as short, specific phrases (e.g., "40% faster", "5-person team", "$100K saved")
 
 Resume text:
 ---
@@ -130,9 +147,13 @@ Resume text:
 class EmailGenerator:
     PROMPT = """You are an expert job application assistant. Given the job posting and candidate resume, generate:
 
-1. **email**: Extract ONLY the email address. Return null if not found.
-2. **subject**: Professional job application subject (max 60 chars, no emojis)
-3. **body**: Professional HTML email body (150-200 words)
+1. **email**: Extract ONLY the email address (e.g., "mgupta@trueigtech.com").
+   - IMPORTANT: Do NOT extract emails from comments, replies, or metadata.
+   - Ignore words before the email like "on", "at", "email:", "contact:", etc.
+   - Return ONLY the valid email format: user@domain.com
+   - If no valid email found, return null.
+2. **subject**: A professional job application email subject line (max 60 characters). Do NOT include any emojis or symbols.
+3. **body**: A professional job application email body in HTML format (150-200 words).
 
 Job Details:
 - Position: [{job_title}]({job_url})
@@ -148,18 +169,18 @@ Resume/CV:
 Candidate: {candidate_name}
 
 Return ONLY valid JSON with exactly these 3 fields:
-{{"email": "extracted@email.com or null", "subject": "Application for...", "body": "<p>Dear Hiring Manager,</p>..."}}
+{{"email": "extracted@email.com" or null, "subject": "Application for [Position] at [Company] - [Name]", "body": "<p>Dear Hiring Manager,</p>...<p>Best regards,<br/>[Name]</p>"}}
 
-CRITICAL RULES:
-- FIRST LINE: <p>Dear Hiring Manager,</p> (nothing before)
-- Use <p>, <ul>, <li>, <strong>, <br/> tags
-- Position must be clickable link: <a href="{job_url}">{job_title}</a>
-- Mention years of experience from resume
-- Map EXACT skills from resume to requirements
-- Include 1-2 quantified achievements
-- Include AI tools integration paragraph
-- NO emojis or special characters
-- Return ONLY the JSON"""
+CRITICAL RULES FOR BODY:
+- Use <p> tags for paragraphs, <ul>/<li> for lists, <strong> for bold, <br/> for line breaks
+- Include the position as a clickable link: <a href="{job_url}">{job_title}</a>
+- FIRST LINE MUST BE: <p>Dear Hiring Manager,</p> (nothing else before)
+- In the opening paragraph, mention years of experience from resume (use total experience from resume, not job requirements)
+- Map EXACT skills from resume to job requirements
+- Include 1-2 quantified achievements from resume (e.g., "40% faster", "5-person team")
+- Include paragraph about AI tools integration
+- Do NOT include any emojis (e.g., 🚀, 💼, ✨, ✅, 🔥), symbols, or special characters - use plain text only
+- Return ONLY the JSON - no markdown, no explanations"""
 
     def __init__(self, llm_service: LLMService):
         self.llm = llm_service
