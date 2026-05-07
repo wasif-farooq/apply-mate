@@ -20,7 +20,7 @@ from src.db import get_db, init_db, User, UserSettings
 from src.linkedin_fetcher import fetch_linkedin_post
 from src.email_extractor import extract_email
 from src.gmail_sender import send_email
-from src.ai_generator import generate_subject, generate_email_body, parse_resume_with_llm
+from src.ai_generator import generate_email_content, parse_resume_with_llm
 from src.resume_handler import load_resume, extract_text_from_pdf
 from src.auth import (
     get_google_auth_url,
@@ -387,25 +387,9 @@ def apply_to_job(
         location = post_data.get("location") or ""
         description = post_data.get("description") or ""
 
-        # Extract email
-        email = request.to_email
-        if not email:
-            text_to_search = f"{title} {company} {description}"
-            extracted = extract_email(text_to_search)
-            email = extracted or ""
-
-        if not email:
-            raise HTTPException(status_code=400, detail="No email found in LinkedIn post and no --to provided")
-
-        # Generate subject
-        try:
-            subject = generate_subject(post_data, config.GMAIL_SENDER_NAME, provider=provider, model=model, api_key=api_key)
-        except Exception as e:
-            logger.warning(f"AI subject generation failed: {e}")
-            subject = f"Application for {title}"
-
-        # Parse resume with user's LLM
+        # Parse resume with user's LLM (if provided)
         resume_parsed = None
+        candidate_name = config.GMAIL_SENDER_NAME
         if request.resume_path:
             try:
                 resume_text = extract_text_from_pdf(request.resume_path)
@@ -415,26 +399,50 @@ def apply_to_job(
                     model=model,
                     api_key=api_key
                 )
+                candidate_name = resume_parsed.get('name', config.GMAIL_SENDER_NAME)
                 logger.info(f"[API] Resume parsed: {resume_parsed.get('name')}, {resume_parsed.get('total_experience_years')} years exp")
             except Exception as e:
                 logger.warning(f"[API] Resume parsing failed: {e}, using fallback")
                 resume_parsed = None
 
-        # Generate body
-        candidate_name = resume_parsed.get('name') if resume_parsed else config.GMAIL_SENDER_NAME
+        # Generate email content (subject, body, extract email) in single AI call
         try:
-            body = generate_email_body(post_data, resume_data=resume_parsed, candidate_name=candidate_name, provider=provider, model=model, api_key=api_key)
+            email_content = generate_email_content(
+                post_data,
+                resume_data=resume_parsed,
+                candidate_name=candidate_name,
+                provider=provider,
+                model=model,
+                api_key=api_key
+            )
+            subject = email_content.get('subject', f"Application for {title}")
+            body = email_content.get('body', '')
+            extracted_email = email_content.get('email')  # Email extracted by AI from job post
+            
+            # Use extracted email from AI, or fallback to request.to_email or regex
+            email = extracted_email or request.to_email
+            if not email:
+                text_to_search = f"{title} {company} {description}"
+                email = extract_email(text_to_search) or ""
+                
         except Exception as e:
-            logger.error(f"AI body generation failed: {e}")
-
-            # Sanitize title - remove #Hiring:, #hiring:, etc.
+            logger.error(f"AI email content generation failed: {e}")
+            
+            # Fallback: extract email with regex
+            email = request.to_email
+            if not email:
+                text_to_search = f"{title} {company} {description}"
+                email = extract_email(text_to_search) or ""
+            
+            # Fallback subject
             clean_title = title
             if '#' in title:
                 clean_title = re.sub(r'#.*?:\s*', '', title).strip()
             if not clean_title:
                 clean_title = "Software Engineer"
-
-            # Full 300-400 word fallback cover letter
+            subject = f"Application for {clean_title}"
+            
+            # Fallback body
             body = f"""Dear Hiring Manager,
 
 I am writing to express my strong interest in the {clean_title} position at {company}{f' in {location}' if location else ''}. With a solid background in software development and a passion for building efficient, scalable solutions, I am excited about the opportunity to contribute to your team.
@@ -449,6 +457,9 @@ Thank you for considering my application. I hope to hear from you soon.
 
 Best regards,
 {candidate_name}"""
+
+        if not email:
+            raise HTTPException(status_code=400, detail="No email found in LinkedIn post and no --to provided")
 
         logger.info(f"[API] Generated email - Subject: {subject[:50]}...")
 

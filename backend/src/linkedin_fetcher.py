@@ -20,6 +20,31 @@ def fetch_linkedin_post(url: str) -> dict:
 
     soup = BeautifulSoup(response.text, "html.parser")
 
+    # Remove ALL comment-related containers to prevent email extraction from comments
+    comment_selectors = [
+        "feed-shared-update-v2__comments-container",
+        "feed-shared-update-v2__comments",
+        "comments-comments-list",
+        "social-details-social-activity",
+        "comments-list",
+        "feed-shared-update-v2__comment-list"
+    ]
+    removed_count = 0
+    for cls in comment_selectors:
+        for elem in soup.find_all("div", class_=cls):
+            elem.decompose()
+            removed_count += 1
+    if removed_count > 0:
+        logger.debug(f"[LinkedIn] Removed {removed_count} comment container(s)")
+
+    # Also remove any element with "comment" in class that looks like a container
+    for elem in soup.find_all(class_=lambda x: x and "comment" in x.lower()):
+        if elem.name in ["div", "section", "ul"]:
+            elem.decompose()
+            removed_count += 1
+    if removed_count > 0:
+        logger.debug(f"[LinkedIn] Total comment elements removed: {removed_count}")
+
     post_data = {
         "url": url,
         "title": "",
@@ -177,11 +202,8 @@ def fetch_linkedin_post(url: str) -> dict:
                     logger.debug(f"[LinkedIn] Fallback description found: {text[:100]}...")
                     break
 
-    # Extract email if present in description
-    if post_data["description"]:
-        email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', post_data["description"])
-        if email_match:
-            logger.info(f"[LinkedIn] Found email in description: {email_match.group()}")
+    # Note: Email extraction is now handled by AI in generate_email_content()
+    # to ensure email is extracted only from description, not comments
 
     logger.debug(f"[LinkedIn] Parsed data - Title: '{post_data['title']}', Company: '{post_data['company']}', Location: '{post_data['location']}', Description: '{post_data['description'][:100]}...'")
 

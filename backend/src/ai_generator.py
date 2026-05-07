@@ -224,6 +224,149 @@ CRITICAL RULES:
         raise
 
 
+def generate_email_content(
+    job_data: dict,
+    resume_data: dict = None,
+    candidate_name: str = None,
+    provider: str = None,
+    model: str = None,
+    api_key: str = None
+) -> dict:
+    """
+    Generate email content in a single AI call.
+    Returns dict with: subject, body, email (extracted from job post if present)
+    """
+    job_url = job_data.get('url', '')
+    job_title = job_data.get('title', 'Unknown Position')
+    company = job_data.get('company', 'Company')
+    location = job_data.get('location', 'Unknown')
+    job_description = job_data.get('description', '')
+
+    # Build resume_text from structured data or use fallback
+    resume_text = ""
+    if resume_data:
+        skills = resume_data.get("skills", [])
+        experience_years = resume_data.get("total_experience_years", "extensive")
+        experience = resume_data.get("experience", [])
+        education = resume_data.get("education", [])
+        key_achievements = resume_data.get("key_achievements", [])
+        certifications = resume_data.get("certifications", [])
+
+        latest_role = experience[0].get('position', 'N/A') if experience else 'N/A'
+        latest_company = experience[0].get('company', 'N/A') if experience else 'N/A'
+        latest_edu = education[0].get('degree', 'N/A') if education else 'N/A'
+        latest_school = education[0].get('institution', 'N/A') if education else 'N/A'
+
+        exp_context = ""
+        for exp in experience[:3]:
+            exp_achievements = exp.get('achievements', [])
+            exp_desc = exp.get('description', '')
+            achievements_str = f" | Achievements: {', '.join(exp_achievements)}" if exp_achievements else ""
+            exp_context += f"- {exp.get('position', 'N/A')} at {exp.get('company', 'N/A')}: {exp_desc[:200]}{achievements_str}\n"
+
+        resume_text = f"""
+Candidate's Resume:
+- Name: {resume_data.get('name', candidate_name or 'Candidate')}
+- Experience: {experience_years} years
+- Skills (EXACT): {', '.join(skills[:15]) if skills else 'Not specified'}
+- Key Achievements: {', '.join(key_achievements[:5]) if key_achievements else 'Not specified'}
+- Certifications: {', '.join(certifications[:3]) if certifications else 'None'}
+- Latest Role: {latest_role} at {latest_company}
+- Education: {latest_edu} from {latest_school}
+- Summary: {resume_data.get('summary', 'Not provided')}
+- Experience Detail:
+{exp_context}
+"""
+        if not candidate_name:
+            candidate_name = resume_data.get('name', 'Candidate')
+    else:
+        resume_text = "[Resume attached]"
+        if not candidate_name:
+            candidate_name = "Candidate"
+
+    # Sanitize job_title
+    clean_job_title = job_title.strip()
+    clean_job_title = re.sub(r'#\w+', '', clean_job_title)
+    clean_job_title = re.sub(r'^(Hiring|hiring|HIRING)[\s:]*', '', clean_job_title)
+    clean_job_title = re.sub(r'^(we are|our team is)\s+hiring\s+', '', clean_job_title, flags=re.IGNORECASE)
+    clean_job_title = clean_job_title.strip(':-').strip()
+    
+    if len(clean_job_title.split()) < 2:
+        clean_job_title = "the position"
+
+    # Combined prompt that extracts email, generates subject, and body
+    prompt = f"""You are an expert job application assistant. Given the job posting and candidate resume, generate:
+
+1. **email**: Extract email address ONLY from the job description text (the main posting content). 
+   - IMPORTANT: Do NOT extract emails from comments, replies, or metadata.
+   - Only extract if email is explicitly in the description section.
+   - If no email in description, return null.
+2. **subject**: A professional job application email subject line (max 60 characters).
+3. **body**: A professional job application email body in HTML format (150-200 words).
+
+Job Details:
+- Position: [{clean_job_title}]({job_url})
+- Company: {company}
+- Location: {location}
+
+Job Description:
+{job_description[:1500]}
+
+Resume/CV:
+{resume_text[:1800]}
+
+Candidate: {candidate_name}
+
+Return ONLY valid JSON with exactly these 3 fields:
+{{
+  "email": "extracted@email.com" or null,
+  "subject": "Application for [Position] at [Company] - [Name]",
+  "body": "<p>Dear Hiring Manager,</p>...<p>Best regards,<br/>[Name]</p>"
+}}
+
+CRITICAL RULES FOR BODY:
+- Use <p> tags for paragraphs, <ul>/<li> for lists, <strong> for bold, <br/> for line breaks
+- Include the position as a clickable link: <a href="{job_url}">{clean_job_title}</a>
+- Map EXACT skills from resume to job requirements
+- Include 1-2 quantified achievements from resume (e.g., "40% faster", "5-person team")
+- Include paragraph about AI tools integration
+- FIRST LINE MUST BE: <p>Dear Hiring Manager,</p> (nothing else before)
+- Return ONLY the JSON - no markdown, no explanations"""
+
+    logger.debug(f"[AI Content] Combined prompt:\n{prompt}")
+
+    try:
+        result = LLMProvider.generate(prompt, provider=provider, model=model, api_key=api_key)
+        logger.debug(f"[AI Content] Raw response: {result}")
+        
+        # Parse JSON from response
+        json_match = re.search(r'\{[^}]+\}', result, re.DOTALL)
+        if json_match:
+            content = json.loads(json_match.group())
+        else:
+            content = json.loads(result)
+        
+        subject = content.get('subject', f"Application for {clean_job_title}").strip()
+        body = content.get('body', '').strip()
+        email = content.get('email')
+        
+        # Clean body
+        body = clean_email_body(body)
+        
+        logger.info(f"[AI Content] Generated - subject: {subject[:50]}..., email found: {bool(email)}")
+        return {
+            'subject': subject,
+            'body': body,
+            'email': email
+        }
+    except json.JSONDecodeError as e:
+        logger.error(f"[AI Content] JSON parse failed: {e}, response: {result}")
+        raise Exception(f"Failed to parse AI response as JSON: {e}")
+    except Exception as e:
+        logger.error(f"[AI Content] Generation failed: {e}")
+        raise
+
+
 def generate_email_body(job_data: dict, resume_data: dict = None, candidate_name: str = None, provider: str = None, model: str = None, api_key: str = None) -> str:
     job_url = job_data.get('url', '')
     job_title = job_data.get('title', 'Unknown Position')
