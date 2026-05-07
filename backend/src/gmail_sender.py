@@ -31,7 +31,7 @@ def create_message(sender: str, to: str, subject: str, body: str, resume_path: s
     message['From'] = sender
     message['Subject'] = subject
     
-    message.attach(MIMEText(body, 'plain'))
+    message.attach(MIMEText(body, 'html'))
     
     if resume_path and os.path.exists(resume_path):
         try:
