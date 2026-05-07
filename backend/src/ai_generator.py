@@ -302,7 +302,7 @@ Candidate's Resume:
    - Ignore words before the email like "on", "at", "email:", "contact:", etc.
    - Return ONLY the valid email format: user@domain.com
    - If no valid email found, return null.
-2. **subject**: A professional job application email subject line (max 60 characters).
+2. **subject**: A professional job application email subject line (max 60 characters). Do NOT include any emojis or symbols.
 3. **body**: A professional job application email body in HTML format (150-200 words).
 
 Job Details:
@@ -333,7 +333,7 @@ CRITICAL RULES FOR BODY:
 - Map EXACT skills from resume to job requirements
 - Include 1-2 quantified achievements from resume (e.g., "40% faster", "5-person team")
 - Include paragraph about AI tools integration
-- Do NOT include emojis or special characters
+- Do NOT include any emojis (e.g., 🚀, 💼, ✨, ✅, 🔥), symbols, or special characters - use plain text only
 - Return ONLY the JSON - no markdown, no explanations"""
 
     logger.debug(f"[AI Content] Combined prompt:\n{prompt}")
