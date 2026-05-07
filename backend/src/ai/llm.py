@@ -61,6 +61,50 @@ class LLMProvider:
                 temperature=0.7,
             )
 
+        elif provider == "ollama_cloud":
+            key = api_key or ""
+            if not key:
+                raise ValueError("OLLAMA_CLOUD_API_KEY not configured")
+            return ChatOpenAI(
+                model=model or "llama3.1",
+                base_url="https://cloud.ollama.com/v1",
+                api_key=key,
+                temperature=0.7,
+            )
+
+        elif provider == "openrouter":
+            key = api_key or ""
+            if not key:
+                raise ValueError("OpenRouter API key not configured")
+            return ChatOpenAI(
+                model=model or "meta-llama/llama-3.1-8b-instruct",
+                base_url="https://openrouter.ai/api/v1",
+                api_key=key,
+                temperature=0.7,
+            )
+
+        elif provider == "opencode_zen":
+            key = api_key or ""
+            if not key:
+                raise ValueError("OpenCode Zen API key not configured")
+            return ChatOpenAI(
+                model=model or "qwen3-coder-32b",
+                base_url="https://opencode.ai/zen/v1",
+                api_key=key,
+                temperature=0.7,
+            )
+
+        elif provider == "opencode_go":
+            key = api_key or ""
+            if not key:
+                raise ValueError("OpenCode Go API key not configured")
+            return ChatOpenAI(
+                model=model or "qwen3-coder-32b",
+                base_url="https://opencode.ai/zen/go/v1",
+                api_key=key,
+                temperature=0.7,
+            )
+
         else:
             raise ValueError(f"Unknown AI provider: {provider}. Use: ollama, openai, anthropic, google")
 
@@ -127,6 +171,10 @@ class LLMProvider:
                 test_llm.invoke("test")
             except Exception:
                 info["status"] = "not_running"
+
+        elif provider == "ollama_cloud":
+            info["model"] = ""
+            info["status"] = "ready"
 
         return info
 

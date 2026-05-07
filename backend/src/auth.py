@@ -100,13 +100,6 @@ def get_google_user_info(access_token: str) -> dict:
     return resp.json()
 
 
-DEFAULT_MODELS = {
-    "ollama": ["gemma4:e2b", "llama3.1:latest", "mistral:latest", "codellama:latest"],
-    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
-    "anthropic": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
-    "google": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
-}
-
 def create_or_update_user(db: Session, google_user: dict, refresh_token: str = None) -> User:
     user = db.query(User).filter(User.google_id == google_user["id"]).first()
     
@@ -125,25 +118,14 @@ def create_or_update_user(db: Session, google_user: dict, refresh_token: str = N
         db.add(settings)
         
         # Create default provider configs
-        for provider in ["ollama", "openai", "anthropic", "google"]:
+        for provider in ["ollama", "ollama_cloud", "openrouter", "opencode_zen", "opencode_go", "openai", "anthropic", "google"]:
             config = ProviderConfig(
                 user_id=user.id,
                 provider=provider,
                 enabled=provider == "ollama",
-                config={"url": "http://localhost:11434", "api_key": ""} if provider == "ollama" else {}
+                config={"url": "http://localhost:11434", "api_key": ""} if provider == "ollama" else {"url": "https://cloud.ollama.com", "api_key": ""} if provider == "ollama_cloud" else {"url": "https://openrouter.ai/api/v1", "api_key": ""} if provider == "openrouter" else {"url": "https://opencode.ai/zen/v1", "api_key": ""} if provider == "opencode_zen" else {"url": "https://opencode.ai/zen/go/v1", "api_key": ""} if provider == "opencode_go" else {}
             )
             db.add(config)
-        
-        # Create default provider models (ollama enabled by default)
-        for provider, models in DEFAULT_MODELS.items():
-            for i, model_name in enumerate(models):
-                model = ProviderModel(
-                    user_id=user.id,
-                    provider=provider,
-                    model_name=model_name,
-                    is_default=(provider == "ollama" and i == 0)
-                )
-                db.add(model)
         
         logger.info(f"[AUTH] Created new user: {user.email}")
     else:
@@ -167,7 +149,10 @@ def get_user_settings(db: Session, user_id: int) -> Optional[dict]:
     settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
     if not settings:
         return None
-    return {}
+    return {
+        "selected_model": settings.selected_model,
+        "selected_provider": settings.selected_provider
+    }
 
 
 def update_user_settings(db: Session, user_id: int, data: dict) -> UserSettings:
@@ -242,55 +227,86 @@ def update_provider_config(db: Session, user_id: int, provider: str, enabled: bo
 
 # Provider Model functions
 
-MODELS = {
-    "ollama": ["gemma4:e2b", "llama3.1:latest", "mistral:latest", "codellama:latest"],
-    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
-    "anthropic": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
-    "google": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
-}
-
-
-def get_available_models(provider: str) -> list:
-    return MODELS.get(provider, [])
-
-
 def get_user_models(db: Session, user_id: int, provider: str) -> list:
     models = db.query(ProviderModel).filter(
         ProviderModel.user_id == user_id,
         ProviderModel.provider == provider
     ).all()
-    return [{"model_name": m.model_name, "is_default": m.is_default} for m in models]
+    return [{"model_name": m.model_name} for m in models]
 
 
 def get_all_user_models(db: Session, user_id: int) -> dict:
     result = {}
-    for provider in MODELS.keys():
+    providers_list = ['ollama', 'ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go', 'openai', 'anthropic', 'google']
+    for provider in providers_list:
         result[provider] = get_user_models(db, user_id, provider)
     return result
 
 
 def update_user_models(db: Session, user_id: int, provider: str, models: list) -> list:
+    print(f"[update_user_models] Called with provider={provider}, models={models}")
+    
     existing = db.query(ProviderModel).filter(
         ProviderModel.user_id == user_id,
         ProviderModel.provider == provider
     ).all()
     
-    for e in existing:
-        db.delete(e)
+    print(f"[update_user_models] Found {len(existing)} existing models: {[m.model_name for m in existing]}")
     
-    new_models = []
+    existing_by_name = {m.model_name: m for m in existing}
+    model_names_in_request = set(m["model_name"] for m in models)
+    
+    # If empty array is sent, preserve existing models
+    if not models:
+        print(f"[update_user_models] Empty array sent, preserving existing models")
+        return [{"model_name": m.model_name} for m in existing]
+    
+    # Add new models that don't exist yet
     for m in models:
-        new_model = ProviderModel(
-            user_id=user_id,
-            provider=provider,
-            model_name=m["model_name"],
-            is_default=m.get("is_default", False)
-        )
-        db.add(new_model)
-        new_models.append(new_model)
+        model_name = m["model_name"]
+        
+        if model_name not in existing_by_name:
+            new_model = ProviderModel(
+                user_id=user_id,
+                provider=provider,
+                model_name=model_name
+            )
+            db.add(new_model)
     
     db.commit()
-    return [{"model_name": m.model_name, "is_default": m.is_default} for m in new_models]
+    
+    print(f"[update_user_models] Committed. Now fetching...")
+    
+    updated = db.query(ProviderModel).filter(
+        ProviderModel.user_id == user_id,
+        ProviderModel.provider == provider
+    ).all()
+    
+    print(f"[update_user_models] Returning {len(updated)} models: {[m.model_name for m in updated]}")
+    
+    return [{"model_name": m.model_name} for m in updated]
+
+
+def merge_user_models(db: Session, user_id: int, provider: str, new_models: list) -> list:
+    """Merge new models with existing ones in the database.
+    Add new models if they don't exist, keep existing configurations."""
+    existing = db.query(ProviderModel).filter(
+        ProviderModel.user_id == user_id,
+        ProviderModel.provider == provider
+    ).all()
+    existing_names = {m.model_name for m in existing}
+
+    for name in new_models:
+        if name not in existing_names:
+            new_model = ProviderModel(
+                user_id=user_id,
+                provider=provider,
+                model_name=name
+            )
+            db.add(new_model)
+
+    db.commit()
+    return get_user_models(db, user_id, provider)
 
 
 def get_default_provider_and_model(db: Session, user_id: int) -> tuple:
@@ -303,26 +319,15 @@ def get_default_provider_and_model(db: Session, user_id: int) -> tuple:
     if not configs:
         logger.info(f"[SETTINGS] Creating default configs for user {user_id}")
         
-        # Create provider configs
-        for provider in ["ollama", "openai", "anthropic", "google"]:
+        # Create provider configs (no default models - user must fetch)
+        for provider in ["ollama", "ollama_cloud", "openrouter", "opencode_zen", "opencode_go", "openai", "anthropic", "google"]:
             config = ProviderConfig(
                 user_id=user_id,
                 provider=provider,
                 enabled=provider == "ollama",
-                config={"url": "http://localhost:11434", "api_key": ""} if provider == "ollama" else {}
+                config={"url": "http://localhost:11434", "api_key": ""} if provider == "ollama" else {"url": "https://cloud.ollama.com", "api_key": ""} if provider == "ollama_cloud" else {"url": "https://openrouter.ai/api/v1", "api_key": ""} if provider == "openrouter" else {"url": "https://opencode.ai/zen/v1", "api_key": ""} if provider == "opencode_zen" else {"url": "https://opencode.ai/zen/go/v1", "api_key": ""} if provider == "opencode_go" else {}
             )
             db.add(config)
-        
-        # Create provider models
-        for provider, models in MODELS.items():
-            for i, model_name in enumerate(models):
-                model = ProviderModel(
-                    user_id=user_id,
-                    provider=provider,
-                    model_name=model_name,
-                    is_default=(provider == "ollama" and i == 0)
-                )
-                db.add(model)
         
         db.commit()
         
@@ -335,19 +340,13 @@ def get_default_provider_and_model(db: Session, user_id: int) -> tuple:
     if not configs:
         return None, None
     
-    # Step 1: Look for explicit default model (is_default=True)
-    for config in configs:
-        default_model = db.query(ProviderModel).filter(
-            ProviderModel.user_id == user_id,
-            ProviderModel.provider == config.provider,
-            ProviderModel.is_default == True
-        ).first()
-        
-        if default_model:
-            logger.info(f"[SETTINGS] Using explicit default: {config.provider}/{default_model.model_name}")
-            return config.provider, default_model.model_name
+    # Step 1: Look for global default from user_settings
+    settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
+    if settings and settings.selected_model and settings.selected_provider:
+        logger.info(f"[SETTINGS] Using global default: {settings.selected_provider}/{settings.selected_model}")
+        return settings.selected_provider, settings.selected_model
     
-    # Step 2: If no explicit default, find first enabled model for first enabled provider
+    # Step 2: If no global default, find first enabled model for first enabled provider
     first_config = configs[0]
     first_model = db.query(ProviderModel).filter(
         ProviderModel.user_id == user_id,

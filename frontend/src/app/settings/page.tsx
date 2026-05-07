@@ -2,18 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useAuth } from '@/lib/auth'
-import { getSettings, updateProviderConfig, updateProviderModels, ProviderConfig, ModelConfig } from '@/lib/api'
-
-const DEFAULT_MODELS: Record<string, string[]> = {
-  ollama: ['gemma4:e2b', 'llama3.1:latest', 'mistral:latest', 'codellama:latest'],
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-  anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
-  google: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash']
-}
+import { useAuth, getToken } from '@/lib/auth'
+import { getSettings, updateProviderConfig, updateProviderModels, updateGlobalSelection, ProviderConfig, ModelConfig } from '@/lib/api'
 
 const PROVIDER_LABELS: Record<string, string> = {
-  ollama: 'Ollama',
+  ollama: 'Ollama (Local)',
+  ollama_cloud: 'Ollama Cloud',
+  openrouter: 'OpenRouter',
+  opencode_zen: 'OpenCode Zen',
+  opencode_go: 'OpenCode Go',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   google: 'Google'
@@ -21,8 +18,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 interface ModelState {
   name: string
-  enabled: boolean
-  is_default: boolean
+  selected: boolean
 }
 
 interface ProviderState {
@@ -40,12 +36,23 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState('ollama')
+  const [globalSelectedModel, setGlobalSelectedModel] = useState<string | null>(null)
+  const [globalSelectedProvider, setGlobalSelectedProvider] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({})
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({})
+  const [ollamaFetching, setOllamaFetching] = useState(false)
+  const [ollamaCloudFetching, setOllamaCloudFetching] = useState(false)
+  const [openrouterFetching, setOpenrouterFetching] = useState(false)
+  const [opencodeZenFetching, setOpencodeZenFetching] = useState(false)
+  const [opencodeGoFetching, setOpencodeGoFetching] = useState(false)
   
   const [providers, setProviders] = useState<Record<string, ProviderState>>({
     ollama: { enabled: true, config: { url: 'http://localhost:11434', api_key: '' }, models: [] },
+    ollama_cloud: { enabled: false, config: { url: 'https://cloud.ollama.com', api_key: '' }, models: [] },
+    openrouter: { enabled: false, config: { url: 'https://openrouter.ai/api/v1', api_key: '' }, models: [] },
+    opencode_zen: { enabled: false, config: { url: 'https://opencode.ai/zen/v1', api_key: '' }, models: [] },
+    opencode_go: { enabled: false, config: { url: 'https://opencode.ai/zen/go/v1', api_key: '' }, models: [] },
     openai: { enabled: false, config: { url: '', api_key: '' }, models: [] },
     anthropic: { enabled: false, config: { url: '', api_key: '' }, models: [] },
     google: { enabled: false, config: { url: '', api_key: '' }, models: [] }
@@ -67,24 +74,26 @@ export default function SettingsPage() {
   const loadSettings = async () => {
     try {
       const data = await getSettings()
+      console.log('[loadSettings] Full data:', JSON.stringify(data))
+      
+      const globalModel = data.selected_model
+      const globalProvider = data.selected_provider
+      
+      setGlobalSelectedModel(globalModel || null)
+      setGlobalSelectedProvider(globalProvider || null)
       
       const newProviders: Record<string, ProviderState> = {}
       const newExpanded: Record<string, boolean> = {}
-      const providerNames = ['ollama', 'openai', 'anthropic', 'google']
+      const providerNames = ['ollama', 'ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go', 'openai', 'anthropic', 'google']
       
       for (const name of providerNames) {
         const existingConfig = data.providers?.find((p: ProviderConfig) => p.provider === name)
         const existingModels = data.models?.[name] || []
-        const allModelNames = DEFAULT_MODELS[name] || []
         
-        const models = allModelNames.map((modelName: string) => {
-          const existing = existingModels.find((m: ModelConfig) => m.model_name === modelName)
-          return {
-            name: modelName,
-            enabled: !!existing,
-            is_default: existing?.is_default || (name === 'ollama' && modelName === 'gemma4:e2b')
-          }
-        })
+        const models = existingModels.map((m: ModelConfig) => ({
+          name: m.model_name,
+          selected: !!(globalModel && globalProvider === name && m.model_name === globalModel)
+        }))
         
         newProviders[name] = {
           enabled: existingConfig?.enabled || (name === 'ollama'),
@@ -111,8 +120,9 @@ export default function SettingsPage() {
     try {
       await updateProviderConfig(name, state.enabled, state.config)
       const models = state.models
-        .filter(m => m.enabled)
-        .map(m => ({ model_name: m.name, is_default: m.is_default }))
+        .filter(m => m.selected)
+        .map(m => ({ model_name: m.name, is_default: m.selected }))
+      console.log(`[saveProvider] ${name}: saving models:`, models)
       await updateProviderModels(name, models)
     } catch (error) {
       console.error('Failed to save provider:', name, error)
@@ -145,31 +155,76 @@ export default function SettingsPage() {
     setHasChanges(true)
   }
 
-  const handleModelSelect = (modelName: string) => {
+  const handleModelSelect = async (modelName: string) => {
+    console.log(`[handleModelSelect] Clicked model: ${modelName}, provider: ${selectedProvider}`)
+    
     setProviders(prev => {
       const provider = prev[selectedProvider]
       if (!provider) return prev
       
-      const updated = { ...prev, [selectedProvider]: { ...provider, models: [...provider.models] } }
-      
-      updated[selectedProvider].models = updated[selectedProvider].models.map(m => ({
-        ...m,
-        enabled: m.name === modelName || m.is_default,
-        is_default: m.name === modelName
+      const updatedModels = provider.models.map(m => ({
+        name: m.name,
+        selected: m.name === modelName
       }))
       
-      return updated
+      console.log(`[handleModelSelect] Updated models:`, updatedModels.map(m => ({name: m.name, selected: m.selected})))
+      
+      return {
+        ...prev,
+        [selectedProvider]: { 
+          ...provider, 
+          models: updatedModels 
+        }
+      }
     })
+    
+    setGlobalSelectedModel(modelName)
+    setGlobalSelectedProvider(selectedProvider)
+    setHasChanges(true)
+    
+    try {
+      await updateGlobalSelection(selectedProvider, modelName)
+    } catch (error) {
+      console.error('Failed to save global selection:', error)
+    }
+  }
+
+const handleModelFetch = (dbModels: { model_name: string; is_default: boolean }[]) => {
+    const provider = providers[selectedProvider]
+    if (!provider) return
+
+    console.log('[handleModelFetch] dbModels:', dbModels)
+    
+    const firstModel = dbModels[0]?.model_name
+    
+    const models = dbModels.map((m, index) => ({
+      name: m.model_name,
+      selected: !!(firstModel && index === 0)
+    }))
+
+    setProviders(prev => ({
+      ...prev,
+      [selectedProvider]: {
+        ...provider,
+        models
+      }
+    }))
+    
+    if (firstModel) {
+      setGlobalSelectedModel(firstModel)
+      setGlobalSelectedProvider(selectedProvider)
+      updateGlobalSelection(selectedProvider, firstModel).catch(console.error)
+    }
     setHasChanges(true)
   }
 
   const handleSave = async () => {
     const enabledProviders = Object.entries(providers).filter(([_, p]) => p.enabled)
-    const hasEnabledModels = enabledProviders.some(([_, p]) => 
-      p.models.some(m => m.enabled)
+    const hasSelectedModels = enabledProviders.some(([_, p]) => 
+      p.models.some(m => m.selected)
     )
     
-    if (!hasEnabledModels) {
+    if (!hasSelectedModels) {
       alert('Please select at least one model before saving.')
       return
     }
@@ -192,7 +247,7 @@ export default function SettingsPage() {
   }
 
   const getActiveProvider = () => {
-    return Object.entries(providers).find(([_, p]) => p.enabled && p.models.some(m => m.is_default))
+    return Object.entries(providers).find(([_, p]) => p.enabled && p.models.some(m => m.selected))
   }
 
   const activeProvider = getActiveProvider()
@@ -271,7 +326,7 @@ export default function SettingsPage() {
               {activeProvider?.[0] ? PROVIDER_LABELS[activeProvider[0]] : 'None'}
             </div>
             <div style={{ fontSize: '12px', color: '#a8b3bc', marginTop: '4px' }}>
-              {activeProvider?.[1]?.models?.find(m => m.is_default)?.name || 'No model selected'}
+              {activeProvider?.[1]?.models?.find(m => m.selected)?.name || 'No model selected'}
             </div>
           </div>
 
@@ -300,7 +355,7 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '15px', fontWeight: 500 }}>{PROVIDER_LABELS[name]}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {state.enabled && state.models.some(m => m.is_default) && (
+{state.enabled && state.models.some(m => m.selected) && (
                     <span style={{ 
                       fontSize: '10px', 
                       background: '#00ed64', 
@@ -320,9 +375,9 @@ export default function SettingsPage() {
                   }} />
                 </div>
               </div>
-              {state.enabled && state.models.some(m => m.is_default) && (
+              {state.enabled && state.models.some(m => m.selected) && (
                 <div style={{ fontSize: '11px', color: '#a8b3bc', marginTop: '6px' }}>
-                  {state.models.find(m => m.is_default)?.name}
+                  {state.models.find(m => m.selected)?.name}
                 </div>
               )}
             </button>
@@ -427,7 +482,7 @@ export default function SettingsPage() {
 
               <div>
                 <label style={{ display: 'block', marginBottom: '12px', color: '#a8b3bc', fontSize: '13px' }}>
-                  Select Model (click to set as default)
+                  Select Model (click to select)
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
                   {currentProvider.models.map(model => (
@@ -435,12 +490,10 @@ export default function SettingsPage() {
                       key={model.name}
                       onClick={() => handleModelSelect(model.name)}
                       style={{
-                        background: model.is_default 
+                        background: model.selected 
                           ? 'rgba(0, 237, 100, 0.15)' 
-                          : model.enabled 
-                            ? 'rgba(255,255,255,0.05)' 
-                            : 'rgba(255,255,255,0.02)',
-                        border: `2px solid ${model.is_default ? '#00ed64' : model.enabled ? '#2a3f4f' : '#1c2d38'}`,
+                          : 'rgba(255,255,255,0.05)',
+                        border: `2px solid ${model.selected ? '#00ed64' : '#2a3f4f'}`,
                         borderRadius: '10px',
                         padding: '14px 16px',
                         cursor: 'pointer',
@@ -449,7 +502,7 @@ export default function SettingsPage() {
                         position: 'relative'
                       }}
                     >
-                      {model.is_default && (
+                      {model.selected && (
                         <div style={{
                           position: 'absolute',
                           top: '8px',
@@ -468,22 +521,243 @@ export default function SettingsPage() {
                         </div>
                       )}
                       <div style={{ 
-                        color: model.is_default ? '#00ed64' : '#fff', 
+                        color: model.selected ? '#00ed64' : '#fff', 
                         fontSize: '13px', 
-                        fontWeight: model.is_default ? 600 : 400,
+                        fontWeight: model.selected ? 600 : 400,
                         marginBottom: '4px'
                       }}>
                         {model.name}
                       </div>
                       <div style={{ 
                         fontSize: '11px', 
-                        color: model.is_default ? '#00ed64' : '#5c6c7a'
+                        color: model.selected ? '#00ed64' : '#5c6c7a'
                       }}>
-                        {model.is_default ? 'Default' : model.enabled ? 'Enabled' : 'Available'}
+                        {model.selected ? 'Selected' : 'Available'}
                       </div>
                     </button>
                   ))}
                 </div>
+
+                {selectedProvider === 'ollama' && (
+                  <button
+                    onClick={async () => {
+                      const baseUrl = currentProvider.config.url || 'http://localhost:11434';
+                      setOllamaFetching(true);
+                      try {
+                        const res = await fetch(`http://localhost:8000/api/settings/models/fetch-ollama?url=${encodeURIComponent(baseUrl)}`, {
+                          headers: { 'Authorization': `Bearer ${getToken()}` }
+                        });
+                        const data = await res.json();
+                        if (data.models) {
+                          handleModelFetch(data.models);
+                        } else if (data.error) {
+                          alert(data.error);
+                        }
+                      } catch (err) {
+                        alert('Failed to fetch models. Is Ollama running?');
+                      }
+                      setOllamaFetching(false);
+                    }}
+                    disabled={ollamaFetching}
+                    style={{
+                      marginTop: '16px',
+                      padding: '10px 16px',
+                      background: ollamaFetching ? '#1c2d38' : '#00ed64',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: ollamaFetching ? '#5c6c7a' : '#001e2b',
+                      fontSize: '14px',
+                      cursor: ollamaFetching ? 'default' : 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    {ollamaFetching ? 'Fetching...' : 'Fetch Models'}
+                  </button>
+                )}
+
+                {selectedProvider === 'ollama_cloud' && (
+                  <button
+                    onClick={async () => {
+                      const apiKey = currentProvider.config.api_key;
+                      if (!apiKey) {
+                        alert('Please enter an API key first');
+                        return;
+                      }
+                      setOllamaCloudFetching(true);
+                      try {
+                        const res = await fetch('http://localhost:8000/api/settings/models/fetch-ollama-cloud', {
+                          method: 'POST',
+                          headers: { 
+                            'Authorization': `Bearer ${getToken()}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({ api_key: apiKey })
+                        });
+                        const data = await res.json();
+                        if (data.models) {
+                          handleModelFetch(data.models);
+                        } else if (data.error) {
+                          alert(data.error);
+                        }
+                      } catch (err) {
+                        alert('Failed to fetch models. Check your API key.');
+                      }
+                      setOllamaCloudFetching(false);
+                    }}
+                    disabled={ollamaCloudFetching}
+                    style={{
+                      marginTop: '16px',
+                      padding: '10px 16px',
+                      background: ollamaCloudFetching ? '#1c2d38' : '#00ed64',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: ollamaCloudFetching ? '#5c6c7a' : '#001e2b',
+                      fontSize: '14px',
+                      cursor: ollamaCloudFetching ? 'default' : 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    {ollamaCloudFetching ? 'Fetching...' : 'Fetch Models'}
+                  </button>
+                )}
+
+                {selectedProvider === 'openrouter' && (
+                  <button
+                    onClick={async () => {
+                      const apiKey = currentProvider.config.api_key;
+                      if (!apiKey) {
+                        alert('Please enter an API key first');
+                        return;
+                      }
+                      setOpenrouterFetching(true);
+                      try {
+                        const res = await fetch('http://localhost:8000/api/settings/models/fetch-openrouter', {
+                          method: 'POST',
+                          headers: { 
+                            'Authorization': `Bearer ${getToken()}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({ api_key: apiKey })
+                        });
+                        const data = await res.json();
+                        if (data.models) {
+                          handleModelFetch(data.models);
+                        } else if (data.error) {
+                          alert(data.error);
+                        }
+                      } catch (err) {
+                        alert('Failed to fetch models. Check your API key.');
+                      }
+                      setOpenrouterFetching(false);
+                    }}
+                    disabled={openrouterFetching}
+                    style={{
+                      marginTop: '16px',
+                      padding: '10px 16px',
+                      background: openrouterFetching ? '#1c2d38' : '#00ed64',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: openrouterFetching ? '#5c6c7a' : '#001e2b',
+                      fontSize: '14px',
+                      cursor: openrouterFetching ? 'default' : 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    {openrouterFetching ? 'Fetching...' : 'Fetch Models'}
+                  </button>
+                )}
+
+                {selectedProvider === 'opencode_zen' && (
+                  <button
+                    onClick={async () => {
+                      const apiKey = currentProvider.config.api_key;
+                      if (!apiKey) {
+                        alert('Please enter an API key first');
+                        return;
+                      }
+                      setOpencodeZenFetching(true);
+                      try {
+                        const res = await fetch('http://localhost:8000/api/settings/models/fetch-opencode', {
+                          method: 'POST',
+                          headers: { 
+                            'Authorization': `Bearer ${getToken()}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({ provider: 'zen', api_key: apiKey })
+                        });
+                        const data = await res.json();
+                        if (data.models) {
+                          handleModelFetch(data.models);
+                        } else if (data.error) {
+                          alert(data.error);
+                        }
+                      } catch (err) {
+                        alert('Failed to fetch models. Check your API key.');
+                      }
+                      setOpencodeZenFetching(false);
+                    }}
+                    disabled={opencodeZenFetching}
+                    style={{
+                      marginTop: '16px',
+                      padding: '10px 16px',
+                      background: opencodeZenFetching ? '#1c2d38' : '#00ed64',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: opencodeZenFetching ? '#5c6c7a' : '#001e2b',
+                      fontSize: '14px',
+                      cursor: opencodeZenFetching ? 'default' : 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    {opencodeZenFetching ? 'Fetching...' : 'Fetch Models'}
+                  </button>
+                )}
+
+                {selectedProvider === 'opencode_go' && (
+                  <button
+                    onClick={async () => {
+                      const apiKey = currentProvider.config.api_key;
+                      if (!apiKey) {
+                        alert('Please enter an API key first');
+                        return;
+                      }
+                      setOpencodeGoFetching(true);
+                      try {
+                        const res = await fetch('http://localhost:8000/api/settings/models/fetch-opencode', {
+                          method: 'POST',
+                          headers: { 
+                            'Authorization': `Bearer ${getToken()}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({ provider: 'go', api_key: apiKey })
+                        });
+                        const data = await res.json();
+                        if (data.models) {
+                          handleModelFetch(data.models);
+                        } else if (data.error) {
+                          alert(data.error);
+                        }
+                      } catch (err) {
+                        alert('Failed to fetch models. Check your API key.');
+                      }
+                      setOpencodeGoFetching(false);
+                    }}
+                    disabled={opencodeGoFetching}
+                    style={{
+                      marginTop: '16px',
+                      padding: '10px 16px',
+                      background: opencodeGoFetching ? '#1c2d38' : '#00ed64',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: opencodeGoFetching ? '#5c6c7a' : '#001e2b',
+                      fontSize: '14px',
+                      cursor: opencodeGoFetching ? 'default' : 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    {opencodeGoFetching ? 'Fetching...' : 'Fetch Models'}
+                  </button>
+                )}
               </div>
             </>
           ) : (

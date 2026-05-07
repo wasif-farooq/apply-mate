@@ -26,6 +26,8 @@ class UserSettings(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    selected_model = Column(String(100), nullable=True)  # The globally selected model name
+    selected_provider = Column(String(50), nullable=True)  # Which provider the selected model belongs to
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -53,7 +55,6 @@ class ProviderModel(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     provider = Column(String(50), nullable=False)
     model_name = Column(String(100), nullable=False)
-    is_default = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="provider_models")

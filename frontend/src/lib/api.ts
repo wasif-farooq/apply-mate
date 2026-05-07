@@ -40,7 +40,8 @@ export interface SendRequest {
 export interface Settings {
   providers: ProviderConfig[]
   models: Record<string, ModelConfig[]>
-  available_models: Record<string, string[]>
+  selected_model: string | null
+  selected_provider: string | null
 }
 
 export interface ProviderConfig {
@@ -87,6 +88,17 @@ export async function updateProviderModels(provider: string, models: { model_nam
   })
   if (!response.ok) {
     throw new Error('Failed to update provider models')
+  }
+}
+
+export async function updateGlobalSelection(provider: string, model: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/settings/selection`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ provider, model })
+  })
+  if (!response.ok) {
+    throw new Error('Failed to update global selection')
   }
 }
 

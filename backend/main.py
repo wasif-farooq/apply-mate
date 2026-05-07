@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import requests
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from datetime import datetime
@@ -8,7 +9,7 @@ from datetime import datetime
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Cookie
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Cookie, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -37,9 +38,8 @@ from src.auth import (
     update_provider_config,
     get_all_user_models,
     update_user_models,
+    merge_user_models,
     get_default_provider_and_model,
-    get_available_models,
-    MODELS,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     FRONTEND_URL
@@ -203,7 +203,7 @@ def get_settings(current_user: User = Depends(get_current_user), db: Session = D
     
     settings = get_user_settings(db, current_user.id)
     if not settings:
-        settings = {}
+        settings = {"selected_model": None, "selected_provider": None}
     
     provider_configs = get_all_provider_configs(db, current_user.id)
     provider_models = get_all_user_models(db, current_user.id)
@@ -211,12 +211,8 @@ def get_settings(current_user: User = Depends(get_current_user), db: Session = D
     return {
         "providers": provider_configs,
         "models": provider_models,
-        "available_models": {
-            "ollama": ["gemma4:e2b", "llama3.1:latest", "mistral:latest", "codellama:latest"],
-            "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
-            "anthropic": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
-            "google": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
-        }
+        "selected_model": settings.get("selected_model"),
+        "selected_provider": settings.get("selected_provider")
     }
 
 
@@ -278,6 +274,156 @@ def update_models(
     """Update models for a provider."""
     updated = update_user_models(db, current_user.id, provider, data.models)
     return {"provider": provider, "models": updated}
+
+
+@app.put("/api/settings/selection")
+def update_global_selection(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the globally selected model."""
+    selected_model = data.get("model")
+    selected_provider = data.get("provider")
+    
+    update_user_settings(db, current_user.id, {
+        "selected_model": selected_model,
+        "selected_provider": selected_provider
+    })
+    
+    return {"selected_model": selected_model, "selected_provider": selected_provider}
+
+
+@app.post("/api/settings/models/fetch-ollama-cloud")
+def fetch_ollama_cloud_models(
+    api_key: str = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fetch available models from Ollama Cloud API and save to database."""
+    try:
+        headers = {"Authorization": f"Bearer {api_key}"}
+        response = requests.get(
+            "https://cloud.ollama.com/api/tags",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            fetched_models = [model.get("name", "") for model in data.get("models", []) if model.get("name")]
+            
+            all_models = merge_user_models(db, current_user.id, "ollama_cloud", fetched_models)
+            return {"models": all_models}
+        elif response.status_code == 401:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        else:
+            raise HTTPException(status_code=response.status_code, detail=f"Failed to fetch models: {response.text}")
+    except requests.RequestException as e:
+        logger.error(f"[API] Failed to fetch Ollama Cloud models: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
+
+
+@app.get("/api/settings/models/fetch-ollama")
+def fetch_local_ollama_models(
+    url: str = Query(default="http://localhost:11434"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fetch available models from local Ollama instance and save to database."""
+    try:
+        health_check = requests.get(f"{url}/api/tags", timeout=5)
+        if health_check.status_code != 200:
+            raise HTTPException(status_code=503, detail="Ollama is not responding")
+        
+        response = requests.get(f"{url}/api/tags", timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            fetched_models = [model.get("name", "") for model in data.get("models", []) if model.get("name")]
+            
+            all_models = merge_user_models(db, current_user.id, "ollama", fetched_models)
+            return {"models": all_models}
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch models")
+    except requests.RequestException as e:
+        logger.error(f"[API] Failed to fetch local Ollama models: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to connect to Ollama: {str(e)}")
+
+
+@app.post("/api/settings/models/fetch-openrouter")
+def fetch_openrouter_models(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fetch available models from OpenRouter API."""
+    api_key = data.get("api_key")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API key is required")
+    
+    try:
+        headers = {"Authorization": f"Bearer {api_key}"}
+        response = requests.get(
+            "https://openrouter.ai/api/v1/models",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            models = [model.get("id", "") for model in data.get("data", []) if model.get("id")]
+            
+            all_models = merge_user_models(db, current_user.id, "openrouter", models)
+            return {"models": all_models}
+        elif response.status_code == 401:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        else:
+            raise HTTPException(status_code=response.status_code, detail=f"Failed to fetch models: {response.text}")
+    except requests.RequestException as e:
+        logger.error(f"[API] Failed to fetch OpenRouter models: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
+
+
+@app.post("/api/settings/models/fetch-opencode")
+def fetch_opencode_models(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fetch available models from OpenCode Zen or Go API."""
+    provider_type = data.get("provider")  # "zen" or "go"
+    api_key = data.get("api_key")
+    
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API key is required")
+    if provider_type not in ["zen", "go"]:
+        raise HTTPException(status_code=400, detail="Provider must be 'zen' or 'go'")
+    
+    base_url = f"https://opencode.ai/zen/{provider_type}/v1" if provider_type == "zen" else "https://opencode.ai/zen/go/v1"
+    
+    try:
+        headers = {"Authorization": f"Bearer {api_key}"}
+        response = requests.get(
+            f"{base_url}/models",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            models = [model.get("id", "") for model in data.get("data", []) if model.get("id")]
+            
+            db_provider = f"opencode_{provider_type}"
+            all_models = merge_user_models(db, current_user.id, db_provider, models)
+            return {"models": all_models}
+        elif response.status_code == 401:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        else:
+            raise HTTPException(status_code=response.status_code, detail=f"Failed to fetch models: {response.text}")
+    except requests.RequestException as e:
+        logger.error(f"[API] Failed to fetch OpenCode models: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
 
 
 # === APPLICATION ROUTES ===
