@@ -297,10 +297,11 @@ Candidate's Resume:
     # Combined prompt that extracts email, generates subject, and body
     prompt = f"""You are an expert job application assistant. Given the job posting and candidate resume, generate:
 
-1. **email**: Extract email address ONLY from the job description text (the main posting content). 
+1. **email**: Extract ONLY the email address (e.g., "mgupta@trueigtech.com").
    - IMPORTANT: Do NOT extract emails from comments, replies, or metadata.
-   - Only extract if email is explicitly in the description section.
-   - If no email in description, return null.
+   - Ignore words before the email like "on", "at", "email:", "contact:", etc.
+   - Return ONLY the valid email format: user@domain.com
+   - If no valid email found, return null.
 2. **subject**: A professional job application email subject line (max 60 characters).
 3. **relevant_experience_years**: Calculate years of experience RELEVANT to this job.
    - Compare the job requirements with candidate's work history in the resume.
@@ -356,6 +357,15 @@ CRITICAL RULES FOR BODY:
         body = content.get('body', '').strip()
         email = content.get('email')
         relevant_exp = content.get('relevant_experience_years', '0')
+        
+        # Clean email - extract only valid email address (remove any prefix like "on", "at", etc.)
+        if email:
+            email_clean = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', str(email))
+            if email_clean:
+                email = email_clean.group()
+                logger.debug(f"[AI Content] Cleaned email: {email}")
+            else:
+                email = None
         
         # Clean body
         body = clean_email_body(body)
