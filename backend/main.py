@@ -19,9 +19,9 @@ import config
 from src.db import get_db, init_db, User, UserSettings
 from src.linkedin_fetcher import fetch_linkedin_post
 from src.email_extractor import extract_email
-from src.resume_handler import load_resume
 from src.gmail_sender import send_email
-from src.ai_generator import generate_subject, generate_email_body
+from src.ai_generator import generate_subject, generate_email_body, parse_resume_with_llm
+from src.resume_handler import load_resume, extract_text_from_pdf
 from src.auth import (
     get_google_auth_url,
     exchange_code_for_tokens,
@@ -404,20 +404,36 @@ def apply_to_job(
             logger.warning(f"AI subject generation failed: {e}")
             subject = f"Application for {title}"
 
+        # Parse resume with user's LLM
+        resume_parsed = None
+        if request.resume_path:
+            try:
+                resume_text = extract_text_from_pdf(request.resume_path)
+                resume_parsed = parse_resume_with_llm(
+                    resume_text,
+                    provider=provider,
+                    model=model,
+                    api_key=api_key
+                )
+                logger.info(f"[API] Resume parsed: {resume_parsed.get('name')}, {resume_parsed.get('total_experience_years')} years exp")
+            except Exception as e:
+                logger.warning(f"[API] Resume parsing failed: {e}, using fallback")
+                resume_parsed = None
+
         # Generate body
-        resume_text = f"[Resume attached: {request.resume_path}]"
+        candidate_name = resume_parsed.get('name') if resume_parsed else config.GMAIL_SENDER_NAME
         try:
-            body = generate_email_body(post_data, resume_text, config.GMAIL_SENDER_NAME, provider=provider, model=model, api_key=api_key)
+            body = generate_email_body(post_data, resume_data=resume_parsed, candidate_name=candidate_name, provider=provider, model=model, api_key=api_key)
         except Exception as e:
             logger.error(f"AI body generation failed: {e}")
-            
+
             # Sanitize title - remove #Hiring:, #hiring:, etc.
             clean_title = title
             if '#' in title:
                 clean_title = re.sub(r'#.*?:\s*', '', title).strip()
             if not clean_title:
                 clean_title = "Software Engineer"
-            
+
             # Full 300-400 word fallback cover letter
             body = f"""Dear Hiring Manager,
 
@@ -432,7 +448,7 @@ I am eager to discuss how my background and skills would benefit your team. I am
 Thank you for considering my application. I hope to hear from you soon.
 
 Best regards,
-{config.GMAIL_SENDER_NAME}"""
+{candidate_name}"""
 
         logger.info(f"[API] Generated email - Subject: {subject[:50]}...")
 

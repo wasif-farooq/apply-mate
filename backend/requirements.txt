@@ -18,3 +18,4 @@ python-multipart
 psycopg2-binary
 authlib
 pyjwt
+pypdf

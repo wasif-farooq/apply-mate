@@ -1,7 +1,83 @@
 import re
+import json
 import config
 from src.logger import logger
 from src.ai.llm import LLMProvider
+
+
+RESUME_EXTRACTION_PROMPT = """You are an expert resume parser. Analyze the resume below and extract structured information.
+
+Return ONLY valid JSON - no markdown, no explanations, no text before or after.
+
+{
+  "name": "Full name of candidate",
+  "email": "Email address",
+  "phone": "Phone number",
+  "location": "City, State/Country",
+  "summary": "2-3 sentence professional summary",
+  "total_experience_years": "Number as string (e.g., '5' or '5+')",
+  "skills": ["Python", "AWS", "Docker", "React", "PostgreSQL"],
+  "education": [
+    {
+      "degree": "Degree type and field (e.g., B.S. Computer Science)",
+      "institution": "University name",
+      "year": "Graduation year"
+    }
+  ],
+  "experience": [
+    {
+      "company": "Company name",
+      "position": "Job title",
+      "duration": "Start - End (e.g., 2020 - Present)",
+      "description": "Key responsibilities and achievements",
+      "achievements": ["Reduced latency by 40%", "Led team of 5", "$50K budget managed"]
+    }
+  ],
+  "key_achievements": ["Increased sales 30%", "Reduced CI/CD time by 50%", "99.9% uptime achieved"],
+  "certifications": ["AWS Solutions Architect", "PMP"],
+  "languages": ["English (Native)", "Spanish (Fluent)"]
+}
+
+Rules:
+- If a field is missing or unclear, use empty string or empty array []
+- Return ONLY the JSON - no preamble, no postamble
+- Be precise: extract actual skills from the resume, don't guess
+- Calculate total_experience_years from work history dates if available
+- Include only technical/professional skills (not soft skills)
+- EXTRACT QUANTIFIABLE ACHIEVEMENTS: Look for percentages (%, %), dollar amounts ($), team sizes, performance metrics, time reductions, efficiency gains
+- Extract achievements as short, specific phrases (e.g., "40% faster", "5-person team", "$100K saved")
+
+Resume text:
+---
+{RESUME_TEXT}
+---
+"""
+
+
+def parse_resume_with_llm(
+    resume_text: str,
+    provider: str = None,
+    model: str = None,
+    api_key: str = None
+) -> dict:
+    """Parse resume text using LLM and return structured data."""
+    prompt = RESUME_EXTRACTION_PROMPT.format(RESUME_TEXT=resume_text[:4000])
+
+    try:
+        result = LLMProvider.generate(prompt, provider=provider, model=model, api_key=api_key)
+        logger.debug(f"[Resume Parse] Raw response: {result}")
+
+        json_match = re.search(r'\{.+\}', result, re.DOTALL)
+        if json_match:
+            parsed = json.loads(json_match.group())
+        else:
+            parsed = json.loads(result)
+
+        logger.info(f"[Resume Parse] Successfully parsed: {parsed.get('name', 'Unknown')}, {parsed.get('total_experience_years', '?')} years exp")
+        return parsed
+    except Exception as e:
+        logger.error(f"[Resume Parse] Failed: {e}")
+        raise
 
 
 def generate_subject(job_data: dict, candidate_name: str, provider: str = None, model: str = None, api_key: str = None) -> str:
@@ -148,16 +224,57 @@ CRITICAL RULES:
         raise
 
 
-def generate_email_body(job_data: dict, resume_text: str, candidate_name: str, provider: str = None, model: str = None, api_key: str = None) -> str:
+def generate_email_body(job_data: dict, resume_data: dict = None, candidate_name: str = None, provider: str = None, model: str = None, api_key: str = None) -> str:
     job_url = job_data.get('url', '')
     job_title = job_data.get('title', 'Unknown Position')
     company = job_data.get('company', 'Company')
     location = job_data.get('location', 'Unknown')
     job_description = job_data.get('description', '')
-    
+
+    # Build resume_text from structured data or use fallback
+    if resume_data:
+        skills = resume_data.get("skills", [])
+        experience_years = resume_data.get("total_experience_years", "extensive")
+        experience = resume_data.get("experience", [])
+        education = resume_data.get("education", [])
+        key_achievements = resume_data.get("key_achievements", [])
+        certifications = resume_data.get("certifications", [])
+
+        latest_role = experience[0].get('position', 'N/A') if experience else 'N/A'
+        latest_company = experience[0].get('company', 'N/A') if experience else 'N/A'
+        latest_edu = education[0].get('degree', 'N/A') if education else 'N/A'
+        latest_school = education[0].get('institution', 'N/A') if education else 'N/A'
+
+        exp_context = ""
+        for exp in experience[:3]:
+            exp_achievements = exp.get('achievements', [])
+            exp_desc = exp.get('description', '')
+            achievements_str = f" | Achievements: {', '.join(exp_achievements)}" if exp_achievements else ""
+            exp_context += f"- {exp.get('position', 'N/A')} at {exp.get('company', 'N/A')}: {exp_desc[:200]}{achievements_str}\n"
+
+        resume_text = f"""
+Candidate's Resume:
+- Name: {resume_data.get('name', candidate_name or 'Candidate')}
+- Experience: {experience_years} years
+- Skills (EXACT): {', '.join(skills[:15]) if skills else 'Not specified'}
+- Key Achievements: {', '.join(key_achievements[:5]) if key_achievements else 'Not specified'}
+- Certifications: {', '.join(certifications[:3]) if certifications else 'None'}
+- Latest Role: {latest_role} at {latest_company}
+- Education: {latest_edu} from {latest_school}
+- Summary: {resume_data.get('summary', 'Not provided')}
+- Experience Detail:
+{exp_context}
+"""
+        if not candidate_name:
+            candidate_name = resume_data.get('name', 'Candidate')
+    else:
+        resume_text = "[Resume attached]"
+        if not candidate_name:
+            candidate_name = "Candidate"
+
     # Enhanced sanitization - remove hashtags, prefixes, clean titles
     job_title = job_title.strip()
-    
+
     # Remove hashtags (#word)
     job_title = re.sub(r'#\w+', '', job_title)
     
@@ -186,21 +303,26 @@ Job Description:
 {job_description[:1000]}
 
 Resume/CV:
-{resume_text[:1500]}
+{resume_text[:1800]}
 
 Candidate: {candidate_name}
 
 Structure:
-1. Opening: Express interest in the position at {company}, mention years of experience (use <p> tag)
-2. Core stack section: <p><strong>My core stack aligns closely with your requirements:</strong></p> followed by <ul><li><strong>Category:</strong> Description</li>...</ul>
-3. AI integration paragraph (use <p> tag)
-4. Why interested: One sentence about why this company interests you (use <p> tag)
-5. Closing: "My CV is attached for your review. Thank you for your time and consideration." (use <p> tag) + sign off with <br/>
+1. Opening: Express interest in the position at {company}, mention years of experience and one specific achievement (use <p> tag)
+2. Core stack section: <p><strong>My core stack aligns closely with your requirements:</strong></p> followed by <ul><li><strong>Category:</strong> Description</li>...</ul> - USE EXACT SKILLS FROM RESUME
+3. ACHIEVEMENTS: Include 1-2 quantified results from resume (e.g., "reduced latency by 40%", "led team of 5")
+4. AI integration paragraph (use <p> tag)
+5. Why interested: One sentence about why this company interests you (use <p> tag)
+6. Closing: "My CV is attached for your review. Thank you for your time and consideration." (use <p> tag) + sign off with <br/>
 
 Sign off:
 <p>Best regards,<br/>{candidate_name}</p>
 
-IMPORTANT: 
+CRITICAL INSTRUCTIONS:
+- Use EXACT skills from resume - if resume lists "Python, AWS, Kubernetes", write about those specific skills
+- Include 1-2 QUANTIFIED ACHIEVEMENTS from the resume (e.g., "40% faster", "99.9% uptime", "5-person team")
+- Reference specific work from experience descriptions when connecting to job requirements
+- Map resume achievements to job requirements - show how your past success translates to this role
 - Use PROPER HTML TAGS for formatting - <p> for paragraphs, <ul>/<li> for lists, <strong> for bold/emphasis, <br/> for line breaks
 - Include the position title AS A CLICKABLE LINK wrapped in <a> tag pointing to: {job_url}
 - Use conversational but professional tone
