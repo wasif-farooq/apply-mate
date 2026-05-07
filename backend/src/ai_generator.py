@@ -302,7 +302,11 @@ Candidate's Resume:
    - Only extract if email is explicitly in the description section.
    - If no email in description, return null.
 2. **subject**: A professional job application email subject line (max 60 characters).
-3. **body**: A professional job application email body in HTML format (150-200 words).
+3. **relevant_experience_years**: Calculate years of experience RELEVANT to this job.
+   - Compare the job requirements with candidate's work history in the resume.
+   - Only count experience where skills/role match the job requirements.
+   - Return a number as string (e.g., "6") or "0" if no relevant experience found.
+4. **body**: A professional job application email body in HTML format (150-200 words).
 
 Job Details:
 - Position: [{clean_job_title}]({job_url})
@@ -317,20 +321,22 @@ Resume/CV:
 
 Candidate: {candidate_name}
 
-Return ONLY valid JSON with exactly these 3 fields:
+Return ONLY valid JSON with exactly these 4 fields:
 {{
   "email": "extracted@email.com" or null,
   "subject": "Application for [Position] at [Company] - [Name]",
+  "relevant_experience_years": "6",
   "body": "<p>Dear Hiring Manager,</p>...<p>Best regards,<br/>[Name]</p>"
 }}
 
 CRITICAL RULES FOR BODY:
 - Use <p> tags for paragraphs, <ul>/<li> for lists, <strong> for bold, <br/> for line breaks
 - Include the position as a clickable link: <a href="{job_url}">{clean_job_title}</a>
+- FIRST LINE MUST BE: <p>Dear Hiring Manager,</p> (nothing else before)
+- In the opening paragraph, mention the RELEVANT years of experience, not total. Format: "With [X] years of relevant experience in [domain], I'm confident..."
 - Map EXACT skills from resume to job requirements
 - Include 1-2 quantified achievements from resume (e.g., "40% faster", "5-person team")
 - Include paragraph about AI tools integration
-- FIRST LINE MUST BE: <p>Dear Hiring Manager,</p> (nothing else before)
 - Return ONLY the JSON - no markdown, no explanations"""
 
     logger.debug(f"[AI Content] Combined prompt:\n{prompt}")
@@ -349,15 +355,17 @@ CRITICAL RULES FOR BODY:
         subject = content.get('subject', f"Application for {clean_job_title}").strip()
         body = content.get('body', '').strip()
         email = content.get('email')
+        relevant_exp = content.get('relevant_experience_years', '0')
         
         # Clean body
         body = clean_email_body(body)
         
-        logger.info(f"[AI Content] Generated - subject: {subject[:50]}..., email found: {bool(email)}")
+        logger.info(f"[AI Content] Generated - subject: {subject[:50]}..., email found: {bool(email)}, relevant exp: {relevant_exp} years")
         return {
             'subject': subject,
             'body': body,
-            'email': email
+            'email': email,
+            'relevant_experience_years': relevant_exp
         }
     except json.JSONDecodeError as e:
         logger.error(f"[AI Content] JSON parse failed: {e}, response: {result}")

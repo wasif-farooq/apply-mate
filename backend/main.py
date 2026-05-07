@@ -300,6 +300,8 @@ class ApplyResponse(BaseModel):
     subject: str
     body: str
     status: str
+    total_experience_years: str = None
+    relevant_experience_years: str = None
 
 
 class SendRequest(BaseModel):
@@ -418,6 +420,10 @@ def apply_to_job(
             subject = email_content.get('subject', f"Application for {title}")
             body = email_content.get('body', '')
             extracted_email = email_content.get('email')  # Email extracted by AI from job post
+            relevant_exp = email_content.get('relevant_experience_years', '0')
+            
+            # Get total experience from parsed resume (fallback to "0" if not available)
+            total_exp = resume_parsed.get('total_experience_years', '0') if resume_parsed else "0"
             
             # Use extracted email from AI, or fallback to request.to_email or regex
             email = extracted_email or request.to_email
@@ -457,6 +463,10 @@ Thank you for considering my application. I hope to hear from you soon.
 
 Best regards,
 {candidate_name}"""
+            
+            # Fallback: use total experience from resume as relevant (fallback to "0")
+            relevant_exp = resume_parsed.get('total_experience_years', '0') if resume_parsed else "0"
+            total_exp = resume_parsed.get('total_experience_years', '0') if resume_parsed else "0"
 
         if not email:
             raise HTTPException(status_code=400, detail="No email found in LinkedIn post and no --to provided")
@@ -471,7 +481,9 @@ Best regards,
             email=email,
             subject=subject,
             body=body,
-            status="generated"
+            status="generated",
+            total_experience_years=total_exp,
+            relevant_experience_years=relevant_exp
         )
 
     except Exception as e:
