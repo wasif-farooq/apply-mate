@@ -22,6 +22,7 @@ export interface ApplyResponse {
   subject: string
   body: string
   status: string
+  application_id?: number
 }
 
 export interface ApplyRequest {
@@ -35,6 +36,28 @@ export interface SendRequest {
   subject: string
   body: string
   resume_path?: string
+  application_id?: number
+}
+
+export interface Application {
+  id: number
+  linkedin_url: string
+  title: string | null
+  company: string | null
+  location: string | null
+  status: 'generated' | 'sent' | 'failed'
+  sent_to_email: string | null
+  subject: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ApplicationStats {
+  total: number
+  sent: number
+  generated: number
+  failed: number
 }
 
 export interface Settings {
@@ -153,4 +176,51 @@ export async function uploadResume(file: File): Promise<{ status: string; path: 
 export async function checkHealth(): Promise<{ status: string }> {
   const response = await fetch(`${API_BASE}/health`)
   return response.json()
+}
+
+export async function getApplications(
+  page: number = 1,
+  limit: number = 50,
+  status?: string
+): Promise<{ applications: Application[]; total: number; page: number; limit: number }> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (status) params.append('status', status)
+  
+  const response = await fetch(`${API_BASE}/api/applications?${params}`, {
+    headers: getHeaders()
+  })
+  if (!response.ok) {
+    throw new Error('Failed to get applications')
+  }
+  return response.json()
+}
+
+export async function getApplicationStats(): Promise<ApplicationStats> {
+  const response = await fetch(`${API_BASE}/api/applications/stats`, {
+    headers: getHeaders()
+  })
+  if (!response.ok) {
+    throw new Error('Failed to get application stats')
+  }
+  return response.json()
+}
+
+export async function getApplication(id: number): Promise<Application> {
+  const response = await fetch(`${API_BASE}/api/applications/${id}`, {
+    headers: getHeaders()
+  })
+  if (!response.ok) {
+    throw new Error('Failed to get application')
+  }
+  return response.json()
+}
+
+export async function deleteApplication(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/applications/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  })
+  if (!response.ok) {
+    throw new Error('Failed to delete application')
+  }
 }

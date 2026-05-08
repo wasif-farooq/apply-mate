@@ -14,6 +14,8 @@ from utils.logger import logger
 from app.routes.auth import router as auth_router
 from app.routes.settings import router as settings_router
 from app.routes.apply import router as apply_router
+from app.routes.applications import router as applications_router
+from app.routes.extension_auth import router as extension_auth_router
 
 settings = get_settings()
 
@@ -30,6 +32,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(settings_router)
 app.include_router(apply_router)
+app.include_router(applications_router)
+app.include_router(extension_auth_router)
 
 
 @app.on_event("startup")

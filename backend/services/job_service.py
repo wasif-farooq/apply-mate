@@ -11,6 +11,7 @@ from utils.logger import logger
 from repositories.user_repo import UserRepository
 from repositories.settings_repo import SettingsRepository
 from repositories.provider_repo import ProviderRepository
+from repositories.application_repo import ApplicationRepository
 from models.domain import JobData, ResumeData, EmailContent
 
 logger = logging.getLogger("job-applier")
@@ -21,11 +22,13 @@ class JobService:
         self,
         user_repo: UserRepository,
         settings_repo: SettingsRepository,
-        provider_repo: ProviderRepository
+        provider_repo: ProviderRepository,
+        application_repo: ApplicationRepository = None
     ):
         self.user_repo = user_repo
         self.settings_repo = settings_repo
         self.provider_repo = provider_repo
+        self.application_repo = application_repo
 
     def _get_provider_config(self, user_id: int, provider: str) -> tuple[Optional[str], Optional[str]]:
         config = self.provider_repo.get_config(user_id, provider)
@@ -117,7 +120,8 @@ class JobService:
         to_email: str,
         subject: str,
         body: str,
-        resume_path: str = None
+        resume_path: str = None,
+        application_id: int = None
     ) -> dict:
         user = self.user_repo.get_by_id(user_id)
 
@@ -129,12 +133,24 @@ class JobService:
             from_email=user.email
         )
 
-        return email_service.send(
+        result = email_service.send(
             to_email=to_email,
             subject=subject,
             body=body,
             resume_path=resume_path
         )
+
+        # Update application status if application_repo is available
+        if self.application_repo and application_id:
+            self.application_repo.update_status(
+                application_id=application_id,
+                status="sent",
+                sent_to_email=to_email,
+                subject=subject,
+                body=body
+            )
+
+        return result
 
     def apply_to_job(
         self,
@@ -186,7 +202,47 @@ class JobService:
 
         total_exp = resume_data.total_experience_years if resume_data else "0"
 
-        return {
+        # Save application to database if application_repo is available
+        application = None
+        if self.application_repo:
+            # Check if application already exists for this URL
+            existing = self.application_repo.get_by_url(user_id, linkedin_url)
+            if existing and existing.status == 'sent':
+                # Create new application for re-apply
+                application = self.application_repo.create(
+                    user_id=user_id,
+                    linkedin_url=linkedin_url,
+                    title=job_data.title,
+                    company=job_data.company,
+                    location=job_data.location,
+                    description=job_data.description[:1000] if job_data.description else None,
+                    resume_path=resume_path,
+                    total_experience_years=total_exp,
+                    status="generated"
+                )
+            elif not existing:
+                # Create new application
+                application = self.application_repo.create(
+                    user_id=user_id,
+                    linkedin_url=linkedin_url,
+                    title=job_data.title,
+                    company=job_data.company,
+                    location=job_data.location,
+                    description=job_data.description[:1000] if job_data.description else None,
+                    resume_path=resume_path,
+                    total_experience_years=total_exp,
+                    status="generated"
+                )
+            else:
+                # Update existing application
+                application = self.application_repo.update_status(
+                    existing.id,
+                    status="generated",
+                    subject=email_content.subject,
+                    body=email_content.body
+                )
+
+        result = {
             'title': job_data.title,
             'company': job_data.company,
             'location': job_data.location,
@@ -197,3 +253,9 @@ class JobService:
             'status': 'generated',
             'total_experience_years': total_exp
         }
+
+        # Include application ID in result
+        if application:
+            result['application_id'] = application.id
+
+        return result

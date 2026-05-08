@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", f"{FRONTEND_URL}/auth/google/callback")
 
+    # Extension Google OAuth (separate client for Chrome extension)
+    EXTENSION_GOOGLE_CLIENT_ID: str = os.getenv("EXTENSION_GOOGLE_CLIENT_ID", "")
+    EXTENSION_GOOGLE_CLIENT_SECRET: str = os.getenv("EXTENSION_GOOGLE_CLIENT_SECRET", "")
+
     # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
@@ -43,7 +47,12 @@ class Settings(BaseSettings):
     GMAIL_SCOPES: list[str] = ["https://www.googleapis.com/auth/gmail.send"]
 
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: list[str] = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "DEBUG").upper()

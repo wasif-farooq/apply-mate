@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from models import User
 from repositories.user_repo import UserRepository
 from repositories.settings_repo import SettingsRepository
 from repositories.provider_repo import ProviderRepository
+from repositories.application_repo import ApplicationRepository
 from services.job_service import JobService
 
 logger = logging.getLogger("job-applier")
@@ -27,6 +28,7 @@ class ApplyRequest(BaseModel):
     provider: str = None
     model: str = None
     api_key: str = None
+    application_id: int = None
 
 
 class ApplyResponse(BaseModel):
@@ -39,6 +41,7 @@ class ApplyResponse(BaseModel):
     body: str
     status: str
     total_experience_years: str = None
+    application_id: int = None
 
 
 class SendRequest(BaseModel):
@@ -46,6 +49,7 @@ class SendRequest(BaseModel):
     subject: str
     body: str
     resume_path: str = "./resume.pdf"
+    application_id: int = None
 
 
 @router.post("/upload-resume")
@@ -94,11 +98,13 @@ def apply_to_job(
     user_repo = UserRepository(db)
     settings_repo = SettingsRepository(db)
     provider_repo = ProviderRepository(db)
+    application_repo = ApplicationRepository(db)
 
     job_service = JobService(
         user_repo=user_repo,
         settings_repo=settings_repo,
-        provider_repo=provider_repo
+        provider_repo=provider_repo,
+        application_repo=application_repo
     )
 
     try:
@@ -144,11 +150,13 @@ def send_job_email(
     user_repo = UserRepository(db)
     settings_repo = SettingsRepository(db)
     provider_repo = ProviderRepository(db)
+    application_repo = ApplicationRepository(db)
 
     job_service = JobService(
         user_repo=user_repo,
         settings_repo=settings_repo,
-        provider_repo=provider_repo
+        provider_repo=provider_repo,
+        application_repo=application_repo
     )
 
     try:
@@ -157,10 +165,20 @@ def send_job_email(
             to_email=request.to_email,
             subject=request.subject,
             body=request.body,
-            resume_path=request.resume_path
+            resume_path=request.resume_path,
+            application_id=request.application_id
         )
         logger.info(f"[API] Email sent successfully to {request.to_email}")
         return result
     except Exception as e:
         logger.error(f"[API] Failed to send email: {e}")
+        
+        # Update application status to failed if application_id provided
+        if request.application_id:
+            application_repo.update_status(
+                request.application_id,
+                status="failed",
+                error_message=str(e)
+            )
+        
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")

@@ -44,30 +44,26 @@ export default function Home() {
           
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {user.picture && (
-                <img 
-                  src={user.picture} 
-                  alt={user.name || 'User'}
-                  style={{ width: '32px', height: '32px', borderRadius: '50%' }}
-                />
-              )}
-              <span style={{ color: '#a8b3bc', fontSize: '14px' }}>
-                {user.name || user.email}
-              </span>
-              <Link href="/apply">
-                <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '14px' }}>
-                  Apply
-                </button>
+              <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
+                Apply
               </Link>
-              <Link href="/settings">
-                <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '14px' }}>
-                  Settings
-                </button>
+              <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
+                History
+              </Link>
+              <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
+                Settings
               </Link>
               <button 
                 onClick={signOut}
-                className="btn btn-secondary"
-                style={{ padding: '8px 16px', fontSize: '14px', borderColor: '#ff6b6b', color: '#ff6b6b' }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #ff6b6b',
+                  color: '#ff6b6b',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
               >
                 Sign Out
               </button>

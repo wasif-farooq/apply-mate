@@ -19,6 +19,7 @@ class User(Base):
     settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
     provider_configs = relationship("ProviderConfig", back_populates="user", cascade="all, delete-orphan")
     provider_models = relationship("ProviderModel", back_populates="user", cascade="all, delete-orphan")
+    applications = relationship("JobApplication", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettings(Base):
@@ -58,3 +59,26 @@ class ProviderModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="provider_models")
+
+
+class JobApplication(Base):
+    __tablename__ = "job_applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    linkedin_url = Column(String(500), nullable=False)
+    title = Column(String(255), nullable=True)
+    company = Column(String(255), nullable=True)
+    location = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    status = Column(String(50), nullable=False, default="generated")  # generated, sent, failed
+    sent_to_email = Column(String(255), nullable=True)
+    subject = Column(String(500), nullable=True)
+    body = Column(Text, nullable=True)
+    resume_path = Column(String(500), nullable=True)
+    total_experience_years = Column(String(20), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="applications")

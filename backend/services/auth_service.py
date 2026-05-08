@@ -97,3 +97,72 @@ class AuthService:
             )
 
         return user
+
+    def get_google_auth_url_extension(self, redirect_uri: str) -> str:
+        """Generate Google OAuth URL for extension with custom redirect URI"""
+        logger.info(f"[Auth] Generating extension OAuth URL, redirect: {redirect_uri[:50]}...")
+
+        client_id = self.settings.EXTENSION_GOOGLE_CLIENT_ID or self.settings.GOOGLE_CLIENT_ID
+        client_secret = self.settings.EXTENSION_GOOGLE_CLIENT_SECRET or self.settings.GOOGLE_CLIENT_SECRET
+
+        client = OAuth2Session(
+            client_id,
+            client_secret,
+            scope=GOOGLE_SCOPES
+        )
+
+        uri, state = client.create_authorization_url(
+            "https://accounts.google.com/o/oauth2/v2/auth",
+            redirect_uri=redirect_uri,
+            access_type="offline",
+            prompt="consent"
+        )
+
+        logger.info(f"[Auth] Extension auth URL generated, state: {state[:20]}...")
+        return uri
+
+    def authenticate_google_extension(self, code: str):
+        """Authenticate Google user for extension - handles own redirect"""
+        logger.info("[Auth] Authenticating extension user")
+
+        client_id = self.settings.EXTENSION_GOOGLE_CLIENT_ID or self.settings.GOOGLE_CLIENT_ID
+        client_secret = self.settings.EXTENSION_GOOGLE_CLIENT_SECRET or self.settings.GOOGLE_CLIENT_SECRET
+
+        client = OAuth2Session(
+            client_id,
+            client_secret
+        )
+
+        token = client.fetch_token(
+            "https://oauth2.googleapis.com/token",
+            code=code,
+            client_id=client_id,
+            client_secret=client_secret,
+            grant_type="authorization_code"
+        )
+
+        google_user = self.get_google_user_info(token["access_token"])
+
+        user = self.user_repo.get_by_google_id(google_user.id)
+
+        if not user:
+            logger.info(f"[Auth] Creating new extension user: {google_user.email}")
+            user = self.user_repo.create(
+                google_id=google_user.id,
+                email=google_user.email,
+                name=google_user.name,
+                picture=google_user.picture,
+                refresh_token=token.get("refresh_token")
+            )
+        else:
+            logger.info(f"[Auth] Updating existing extension user: {google_user.email}")
+            refresh_token = token.get("refresh_token")
+            self.user_repo.update(
+                user,
+                email=google_user.email,
+                name=google_user.name,
+                picture=google_user.picture,
+                **({"refresh_token": refresh_token} if refresh_token else {})
+            )
+
+        return user

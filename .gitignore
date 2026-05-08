@@ -8,10 +8,15 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg/
 
 # Environment
 .env
 .env.local
+.env.*.local
 
 # OAuth / Credentials
 token.json
@@ -24,19 +29,41 @@ uploads/
 # Logs
 logs/
 *.log
+*.log.*
 
 # Node (frontend)
 node_modules/
 .next/
 out/
+apps/frontend/node_modules/
+apps/extension/node_modules/
+
+# pnpm
+pnpm-debug.log*
+pnpm-store/
+
+# Turborepo
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.swn
 
 # OS
 .DS_Store
 Thumbs.db
+
+# GitNexus
 .gitnexus
+
+# Misc
+*.bak
+*.tmp
+temp/
+*.temp

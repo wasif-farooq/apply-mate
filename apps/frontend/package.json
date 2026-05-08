@@ -1,5 +1,5 @@
 {
-  "name": "applymate-frontend",
+  "name": "@applymate/frontend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@applymate/shared": "workspace:*",
+    "@applymate/ui": "workspace:*",
     "@tiptap/extension-image": "^3.22.5",
     "@tiptap/extension-link": "^3.22.5",
     "@tiptap/extension-table": "^3.22.5",
