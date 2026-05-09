@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { useApplyFlow, cleanEmailHTML } from '@/hooks/useApplyFlow'
 import { useAuth } from '@/lib/auth'
+import { formatFileSize } from '@/lib/api'
 import { StepIndicator, JobDetailsCard, ProcessingState, Header } from '@applybuddy/ui'
 import DOMPurify from 'dompurify'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -221,6 +222,8 @@ function UrlInputStep({
   )
 }
 
+import { Resume } from '@/lib/api'
+
 function ResumeStep({ 
   resumeFile, 
   dragActive, 
@@ -231,7 +234,10 @@ function ResumeStep({
   loading,
   uploading,
   onNext,
-  onSkip
+  onSkip,
+  resumes,
+  selectedResumeId,
+  onSelectResume
 }: { 
   resumeFile: File | null; 
   dragActive: boolean;
@@ -243,8 +249,13 @@ function ResumeStep({
   uploading: boolean;
   onNext: () => void;
   onSkip: () => void;
+  resumes: Resume[];
+  selectedResumeId: number | null;
+  onSelectResume: (id: number | null) => void;
 }) {
   const dropzoneRef = useRef<HTMLDivElement>(null)
+
+  const hasSavedResumes = resumes.length > 0
 
   return (
     <div style={{
@@ -257,45 +268,123 @@ function ResumeStep({
         <p style={{ color: '#a8b3bc' }}>Optional - Attach your resume to the application</p>
       </div>
       
-      <div
-        ref={dropzoneRef}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        onClick={() => document.getElementById('file-input')?.click()}
-        style={{
-          background: dragActive ? 'rgba(0, 237, 100, 0.1)' : 'rgba(255,255,255,0.05)',
-          border: `2px dashed ${dragActive ? '#00ed64' : 'rgba(255,255,255,0.2)'}`,
-          borderRadius: '16px',
-          padding: '48px',
-          textAlign: 'center',
-          cursor: 'pointer',
-          marginBottom: '24px',
-          transition: 'all 0.2s'
-        }}
-      >
-        <input
-          id="file-input"
-          type="file"
-          accept=".pdf"
-          onChange={onFileSelect}
-          style={{ display: 'none' }}
-        />
-        
-        {resumeFile ? (
-          <div>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
-            <p style={{ fontSize: '16px', marginBottom: '8px' }}>{resumeFile.name}</p>
-            <p style={{ color: '#00ed64', fontSize: '14px' }}>Click or drag to change</p>
+      {hasSavedResumes ? (
+        <div style={{ marginBottom: '24px' }}>
+          {resumes.map((resume) => (
+            <div
+              key={resume.id}
+              onClick={() => onSelectResume(resume.id)}
+              style={{
+                padding: '12px 16px',
+                background: selectedResumeId === resume.id 
+                  ? 'rgba(0,237,100,0.1)' 
+                  : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${selectedResumeId === resume.id 
+                  ? '#00ed64' 
+                  : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: '12px',
+                marginBottom: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'all 0.2s'
+              }}
+            >
+              <span style={{ marginRight: '12px', fontSize: '20px' }}>📄</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: 500, color: '#fff' }}>
+                  {resume.filename}
+                  {resume.is_default && (
+                    <span style={{ 
+                      marginLeft: '8px', 
+                      fontSize: '11px', 
+                      background: '#00ed64', 
+                      color: '#001e2b',
+                      padding: '2px 6px', 
+                      borderRadius: '4px',
+                      fontWeight: 600
+                    }}>
+                      Default
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                  {formatFileSize(resume.file_size)} • {new Date(resume.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          <input
+            id="file-input-new"
+            type="file"
+            accept=".pdf"
+            onChange={onFileSelect}
+            style={{ display: 'none' }}
+          />
+          
+          <div
+            onClick={() => document.getElementById('file-input-new')?.click()}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            style={{
+              background: dragActive ? 'rgba(0, 237, 100, 0.1)' : 'rgba(255,255,255,0.03)',
+              border: `2px dashed ${dragActive ? '#00ed64' : 'rgba(255,255,255,0.2)'}`,
+              borderRadius: '16px',
+              padding: '24px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              marginTop: '16px',
+              transition: 'all 0.2s'
+            }}
+          >
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📁</div>
+            <p style={{ fontSize: '14px', marginBottom: '4px', color: '#fff' }}>Drop PDF here or click to upload</p>
+            <p style={{ fontSize: '12px', color: '#6b7280' }}>PDF files only</p>
           </div>
-        ) : (
-          <div>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📁</div>
-            <p style={{ fontSize: '16px', marginBottom: '8px' }}>Drop PDF here or click to upload</p>
-            <p style={{ color: '#a8b3bc', fontSize: '14px' }}>PDF files only</p>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div
+          ref={dropzoneRef}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          onClick={() => document.getElementById('file-input')?.click()}
+          style={{
+            background: dragActive ? 'rgba(0, 237, 100, 0.1)' : 'rgba(255,255,255,0.05)',
+            border: `2px dashed ${dragActive ? '#00ed64' : 'rgba(255,255,255,0.2)'}`,
+            borderRadius: '16px',
+            padding: '48px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            marginBottom: '24px',
+            transition: 'all 0.2s'
+          }}
+        >
+          <input
+            id="file-input"
+            type="file"
+            accept=".pdf"
+            onChange={onFileSelect}
+            style={{ display: 'none' }}
+          />
+          
+          {resumeFile ? (
+            <div>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
+              <p style={{ fontSize: '16px', marginBottom: '8px' }}>{resumeFile.name}</p>
+              <p style={{ color: '#00ed64', fontSize: '14px' }}>Click or drag to change</p>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📁</div>
+              <p style={{ fontSize: '16px', marginBottom: '8px' }}>Drop PDF here or click to upload</p>
+              <p style={{ color: '#a8b3bc', fontSize: '14px' }}>PDF files only</p>
+            </div>
+          )}
+        </div>
+      )}
       
       <div style={{ display: 'flex', gap: '16px' }}>
         <button
@@ -557,6 +646,9 @@ export default function ApplyPage() {
     sent,
     dragActive,
     bodyEditMode,
+    resumes,
+    selectedResumeId,
+    setSelectedResumeId,
     setLinkedinUrl,
     setDragActive,
     setBodyEditMode,
@@ -578,6 +670,7 @@ export default function ApplyPage() {
     { href: '/apply', label: 'Apply', active: true },
     { href: '/history', label: 'History', active: false },
     { href: '/settings', label: 'Settings', active: false },
+    { href: '/resumes', label: 'Resumes', active: false },
   ]
 
   if (authLoading) {
@@ -662,6 +755,9 @@ export default function ApplyPage() {
           uploading={uploading}
           onNext={handleNext}
           onSkip={handleSkipResume}
+          resumes={resumes}
+          selectedResumeId={selectedResumeId}
+          onSelectResume={setSelectedResumeId}
         />
       )}
 

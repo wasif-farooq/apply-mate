@@ -3,86 +3,90 @@ import LoginPage from './pages/LoginPage'
 import ApplyPage from './pages/ApplyPage'
 import PreviewPage from './pages/PreviewPage'
 import SettingsPage from './pages/SettingsPage'
+import { useAuthStorage, useSettingsStorage, useAuth } from '../hooks'
+import { EmailData } from '../types'
 
 type Page = 'login' | 'apply' | 'preview' | 'settings'
 
-interface AppState {
-  page: Page
-  isAuthenticated: boolean
-  backendUrl: string
-}
-
-const DEFAULT_BACKEND_URL = 'http://localhost:8000'
-
 export default function App() {
-  const [state, setState] = useState<AppState>({
-    page: 'login',
-    isAuthenticated: false,
-    backendUrl: DEFAULT_BACKEND_URL,
-  })
-  const [emailData, setEmailData] = useState<any>(null)
+  const [page, setPage] = useState<Page>('login')
+  const [emailData, setEmailData] = useState<EmailData | null>(null)
+  
+  const { getToken } = useAuthStorage()
+  const { getBackendUrl, getLinkedInUrl, getSelectedResumeId } = useSettingsStorage()
+  const { logout } = useAuth()
+
+  const [backendUrl, setBackendUrl] = useState('http://localhost:8000')
+  const [linkedInUrl, setLinkedInUrl] = useState('')
+  const [resumeId, setResumeId] = useState(0)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    loadState()
+    loadInitialState()
   }, [])
 
-  const loadState = async () => {
+  const loadInitialState = async () => {
     try {
-      const [auth, settings] = await Promise.all([
-        chrome.storage.local.get('auth_token'),
-        chrome.storage.local.get('backend_url'),
+      const [token, url, linkedUrl, selectedResumeId] = await Promise.all([
+        getToken(),
+        getBackendUrl(),
+        getLinkedInUrl(),
+        getSelectedResumeId(),
       ])
 
-      const isAuthenticated = !!auth.auth_token
-      const backendUrl = settings.backend_url || DEFAULT_BACKEND_URL
-
-      setState({
-        page: isAuthenticated ? 'apply' : 'login',
-        isAuthenticated,
-        backendUrl,
-      })
+      setBackendUrl(url)
+      setLinkedInUrl(linkedUrl)
+      setResumeId(selectedResumeId)
+      setIsAuthenticated(!!token)
+      setPage(!!token ? 'apply' : 'login')
     } catch (err) {
       console.error('Failed to load state:', err)
     }
   }
 
   const handleLogin = () => {
-    setState((prev) => ({ ...prev, isAuthenticated: true, page: 'apply' }))
+    setIsAuthenticated(true)
+    setPage('apply')
   }
 
   const handleLogout = async () => {
-    await chrome.storage.local.remove(['auth_token', 'user_email'])
-    setState((prev) => ({ ...prev, isAuthenticated: false, page: 'login' }))
+    await logout()
+    setIsAuthenticated(false)
+    setPage('login')
   }
 
-  const handleGeneratedEmail = (data: any) => {
+  const handleGeneratedEmail = (data: EmailData) => {
     setEmailData(data)
-    setState((prev) => ({ ...prev, page: 'preview' }))
+    setPage('preview')
   }
 
   const handleBackToApply = () => {
     setEmailData(null)
-    setState((prev) => ({ ...prev, page: 'apply' }))
+    setPage('apply')
   }
 
   const handleSentEmail = () => {
     setEmailData(null)
-    setState((prev) => ({ ...prev, page: 'apply' }))
+    setPage('apply')
   }
 
-  const handleNavigate = (page: Page) => {
-    setState((prev) => ({ ...prev, page }))
+  const handleNavigate = (targetPage: Page) => {
+    setPage(targetPage)
   }
 
   const handleBackendUrlChange = (url: string) => {
-    setState((prev) => ({ ...prev, backendUrl: url }))
+    setBackendUrl(url)
   }
 
-  switch (state.page) {
+  const handleSettings = () => {
+    setPage('settings')
+  }
+
+  switch (page) {
     case 'login':
       return (
         <LoginPage
-          backendUrl={state.backendUrl}
+          backendUrl={backendUrl}
           onLogin={handleLogin}
         />
       )
@@ -90,17 +94,20 @@ export default function App() {
     case 'apply':
       return (
         <ApplyPage
-          backendUrl={state.backendUrl}
+          backendUrl={backendUrl}
+          initialLinkedinUrl={linkedInUrl}
+          initialResumeId={resumeId}
           onGenerated={handleGeneratedEmail}
           onLogout={handleLogout}
+          onSettings={handleSettings}
         />
       )
 
     case 'preview':
       return (
         <PreviewPage
-          backendUrl={state.backendUrl}
-          emailData={emailData}
+          backendUrl={backendUrl}
+          emailData={emailData!}
           onBack={handleBackToApply}
           onSent={handleSentEmail}
         />
@@ -109,10 +116,10 @@ export default function App() {
     case 'settings':
       return (
         <SettingsPage
-          backendUrl={state.backendUrl}
+          backendUrl={backendUrl}
           onBackendUrlChange={handleBackendUrlChange}
           onLogout={handleLogout}
-          onBack={() => handleNavigate(state.isAuthenticated ? 'apply' : 'login')}
+          onBack={() => handleNavigate(isAuthenticated ? 'apply' : 'login')}
         />
       )
 

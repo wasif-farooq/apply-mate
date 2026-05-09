@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { applyToJob, sendEmail, uploadResume, ApplyResponse } from '@/lib/api'
+import { useState, useCallback, useEffect } from 'react'
+import { applyToJob, sendEmail, uploadResume, getResumes, ApplyResponse, Resume } from '@/lib/api'
 
 export type Step = 'url' | 'resume' | 'processing' | 'preview'
 
@@ -53,6 +53,10 @@ export interface UseApplyFlowReturn {
   sent: boolean
   dragActive: boolean
   bodyEditMode: boolean
+  resumes: Resume[]
+  selectedResumeId: number | null
+  setSelectedResumeId: (id: number | null) => void
+  fetchResumes: () => Promise<void>
   setLinkedinUrl: (url: string) => void
   setResumeFile: (file: File | null) => void
   setResumePath: (path: string) => void
@@ -87,6 +91,31 @@ export function useApplyFlow(): UseApplyFlowReturn {
   const [sent, setSent] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [bodyEditMode, setBodyEditMode] = useState(false)
+  const [resumes, setResumes] = useState<Resume[]>([])
+  const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null)
+
+  const fetchResumes = useCallback(async () => {
+    try {
+      const data = await getResumes()
+      setResumes(data)
+      if (data.length > 0) {
+        const defaultResume = data.find(r => r.is_default)
+        if (defaultResume) {
+          setSelectedResumeId(defaultResume.id)
+        } else {
+          setSelectedResumeId(data[0].id)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch resumes:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (step === 'resume') {
+      fetchResumes()
+    }
+  }, [step, fetchResumes])
 
   const handleUrlSubmit = useCallback(() => {
     if (!linkedinUrl.trim()) {
@@ -113,14 +142,14 @@ export function useApplyFlow(): UseApplyFlowReturn {
     }
   }, [resumeFile])
 
-  const generateEmail = useCallback(async () => {
+  const generateEmail = useCallback(async (resumePathOverride?: string) => {
     setLoading(true)
     setError('')
 
     try {
       const result = await applyToJob({
         linkedin_url: linkedinUrl,
-        resume_path: resumePath || undefined
+        resume_path: resumePathOverride || resumePath || undefined
       })
       setGeneratedEmail(result)
       setStep('preview')
@@ -136,9 +165,18 @@ export function useApplyFlow(): UseApplyFlowReturn {
     if (resumeFile && !resumePath) {
       await handleResumeUpload()
     }
+    
+    let finalResumePath = resumePath
+    if (!finalResumePath && selectedResumeId) {
+      const selectedResume = resumes.find(r => r.id === selectedResumeId)
+      if (selectedResume) {
+        finalResumePath = selectedResume.file_path
+      }
+    }
+    
     setStep('processing')
-    generateEmail()
-  }, [resumeFile, resumePath, handleResumeUpload, generateEmail])
+    generateEmail(finalResumePath)
+  }, [resumeFile, resumePath, selectedResumeId, resumes, handleResumeUpload, generateEmail])
 
   const handleSkipResume = useCallback(() => {
     setStep('processing')
@@ -199,6 +237,7 @@ export function useApplyFlow(): UseApplyFlowReturn {
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setResumeFile(e.target.files[0])
+      setSelectedResumeId(null)
     }
   }, [])
 
@@ -215,6 +254,10 @@ export function useApplyFlow(): UseApplyFlowReturn {
     sent,
     dragActive,
     bodyEditMode,
+    resumes,
+    selectedResumeId,
+    setSelectedResumeId,
+    fetchResumes,
     setLinkedinUrl,
     setResumeFile,
     setResumePath,

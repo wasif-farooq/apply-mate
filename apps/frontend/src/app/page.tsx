@@ -55,6 +55,9 @@ export default function Home() {
               <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
                 Settings
               </Link>
+              <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
+                Resumes
+              </Link>
               <button 
                 onClick={signOut}
                 style={{

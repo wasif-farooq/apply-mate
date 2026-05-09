@@ -39,6 +39,21 @@ export interface SendRequest {
   application_id?: number
 }
 
+export interface Resume {
+  id: number
+  filename: string
+  file_path: string
+  is_default: boolean
+  created_at: string
+  file_size: number
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
 export interface Application {
   id: number
   linkedin_url: string
@@ -171,6 +186,54 @@ export async function uploadResume(file: File): Promise<{ status: string; path: 
   }
 
   return response.json()
+}
+
+export async function getResumes(): Promise<Resume[]> {
+  const token = getToken()
+  const response = await fetch(`${API_BASE}/api/resumes`, {
+    headers: {
+      ...getHeaders(),
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to get resumes')
+  }
+
+  return response.json()
+}
+
+export async function setDefaultResume(resumeId: number): Promise<Resume> {
+  const token = getToken()
+  const response = await fetch(`${API_BASE}/api/resumes/${resumeId}/set-default`, {
+    method: 'POST',
+    headers: {
+      ...getHeaders(),
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to set default resume')
+  }
+
+  return response.json()
+}
+
+export async function deleteResume(resumeId: number): Promise<void> {
+  const token = getToken()
+  const response = await fetch(`${API_BASE}/api/resumes/${resumeId}`, {
+    method: 'DELETE',
+    headers: {
+      ...getHeaders(),
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to delete resume')
+  }
 }
 
 export async function checkHealth(): Promise<{ status: string }> {

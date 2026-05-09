@@ -1,5 +1,10 @@
 import { useState } from 'react'
 import { LogoIcon } from '@applybuddy/ui'
+import { useAuth } from '../../hooks'
+import { ErrorToast } from '../components'
+import '../../styles/theme.css'
+import '../../styles/components.css'
+import '../../styles/pages.css'
 
 interface LoginPageProps {
   backendUrl: string
@@ -14,188 +19,23 @@ const FEATURES = [
 ]
 
 export default function LoginPage({ backendUrl, onLogin }: LoginPageProps) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const { login, loading, error } = useAuth()
+  const [localError, setLocalError] = useState('')
 
   const handleGoogleLogin = async () => {
-    setLoading(true)
-    setError('')
-
+    setLocalError('')
     try {
-      const token = await new Promise<string>((resolve, reject) => {
-        chrome.identity.getAuthToken({ interactive: true }, (token) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message))
-          } else {
-            resolve(token as string)
-          }
-        })
-      })
-
-      if (!token) {
-        throw new Error('Failed to get auth token')
-      }
-
-      const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      if (!userResponse.ok) {
-        throw new Error('Failed to get user info')
-      }
-
-      const userInfo = await userResponse.json()
-
-      const sessionResponse = await fetch(`${backendUrl}/auth/extension/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      })
-
-      if (!sessionResponse.ok) {
-        throw new Error('Failed to create session')
-      }
-
-      const sessionData = await sessionResponse.json()
-
-      await chrome.storage.local.set({
-        auth_token: sessionData.access_token,
-        user_email: userInfo.email,
-      })
-
+      await login(backendUrl)
       onLogin()
     } catch (err: any) {
-      console.error('Login error:', err)
-      setError(err.message || 'Login failed. Please try again.')
-    } finally {
-      setLoading(false)
+      setLocalError(err.message || 'Login failed. Please try again.')
     }
   }
 
+  const displayError = error || localError
+
   return (
     <div className="login-page">
-      <style>{`
-        .login-page {
-          width: 380px;
-          min-height: 520px;
-          background: #001e2b;
-          color: #ffffff;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          display: flex;
-          flex-direction: column;
-        }
-        .login-header {
-          text-align: center;
-          padding: 32px 20px 24px;
-        }
-        .logo-wrapper {
-          display: flex;
-          justify-content: center;
-          margin-bottom: 12px;
-        }
-        .logo-title {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .logo-title h1 {
-          font-size: 22px;
-          font-weight: 600;
-          color: #00ed64;
-          margin: 0;
-        }
-        .tagline {
-          color: #a8b3bc;
-          font-size: 14px;
-          margin: 0;
-          line-height: 1.5;
-        }
-        .features-section {
-          flex: 1;
-          padding: 0 20px;
-        }
-        .features-list {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        .feature-item {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          padding: 14px;
-          background: #0d1f2b;
-          border-radius: 10px;
-          border: 1px solid #1c2d38;
-        }
-        .feature-icon {
-          font-size: 18px;
-          flex-shrink: 0;
-        }
-        .feature-text h3 {
-          font-size: 13px;
-          font-weight: 600;
-          color: #fff;
-          margin: 0 0 4px 0;
-        }
-        .feature-text p {
-          font-size: 12px;
-          color: #6b7280;
-          margin: 0;
-        }
-        .button-section {
-          padding: 20px;
-        }
-        .error-message {
-          background: rgba(255,107,107,0.1);
-          border: 1px solid #ff6b6b;
-          color: #ff6b6b;
-          padding: 12px 16px;
-          border-radius: 8px;
-          margin-bottom: 16px;
-          font-size: 13px;
-        }
-        .google-btn {
-          width: 100%;
-          padding: 14px 20px;
-          background: #0d1f2b;
-          border: 1px solid #1c2d38;
-          border-radius: 10px;
-          color: #fff;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          transition: all 0.2s;
-        }
-        .google-btn:hover:not(:disabled) {
-          background: #132836;
-          border-color: #00ed64;
-        }
-        .google-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        .google-icon {
-          width: 18px;
-          height: 18px;
-        }
-        .loading-spinner {
-          width: 18px;
-          height: 18px;
-          border: 2px solid #1c2d38;
-          border-top-color: #00ed64;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-
       <div className="login-header">
         <div className="logo-wrapper">
           <div className="logo-title">
@@ -223,7 +63,7 @@ export default function LoginPage({ backendUrl, onLogin }: LoginPageProps) {
       </div>
 
       <div className="button-section">
-        {error && <div className="error-message">{error}</div>}
+        {displayError && <ErrorToast message={displayError} onDismiss={() => setLocalError('')} />}
 
         <button
           className="google-btn"
@@ -231,7 +71,7 @@ export default function LoginPage({ backendUrl, onLogin }: LoginPageProps) {
           disabled={loading}
         >
           {loading ? (
-            <span className="loading-spinner" />
+            <span className="ext-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
           ) : (
             <>
               <svg className="google-icon" viewBox="0 0 24 24">

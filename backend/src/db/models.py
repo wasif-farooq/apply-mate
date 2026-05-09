@@ -21,6 +21,7 @@ class User(Base):
     provider_configs = relationship("ProviderConfig", back_populates="user", cascade="all, delete-orphan")
     provider_models = relationship("ProviderModel", back_populates="user", cascade="all, delete-orphan")
     applications = relationship("JobApplication", back_populates="user", cascade="all, delete-orphan")
+    resumes = relationship("UserResume", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettings(Base):
@@ -83,3 +84,16 @@ class JobApplication(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="applications")
+
+
+class UserResume(Base):
+    __tablename__ = "user_resumes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    filename = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="resumes")
