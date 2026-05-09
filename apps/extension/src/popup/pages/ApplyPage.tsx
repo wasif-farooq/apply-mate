@@ -4,6 +4,7 @@ import { StepIndicator, ProcessingState } from '@applymate/ui'
 interface ApplyPageProps {
   backendUrl: string
   onGenerated: (data: any) => void
+  onLogout?: () => void
 }
 
 const STEPS = [
@@ -14,7 +15,7 @@ const STEPS = [
 
 type Step = 'url' | 'resume' | 'processing'
 
-export default function ApplyPage({ backendUrl, onGenerated }: ApplyPageProps) {
+export default function ApplyPage({ backendUrl, onGenerated, onLogout }: ApplyPageProps) {
   const [step, setStep] = useState<Step>('url')
   const [linkedinUrl, setLinkedinUrl] = useState('')
   const [resumeFile, setResumeFile] = useState<File | null>(null)
@@ -138,9 +139,16 @@ export default function ApplyPage({ backendUrl, onGenerated }: ApplyPageProps) {
     <div className="apply-page">
       <div className="header">
         <h1>ApplyMate</h1>
-        <button className="settings-icon" onClick={() => chrome.tabs.create({ url: 'http://localhost:3000/settings' })}>
-          ⚙️
-        </button>
+        <div className="header-actions">
+          {onLogout && (
+            <button className="logout-icon" onClick={onLogout} title="Sign Out">
+              🚪
+            </button>
+          )}
+          <button className="settings-icon" onClick={() => chrome.tabs.create({ url: 'http://localhost:3000/settings' })}>
+            ⚙️
+          </button>
+        </div>
       </div>
 
       <StepIndicator steps={STEPS} currentStep={step} />
@@ -244,7 +252,12 @@ export default function ApplyPage({ backendUrl, onGenerated }: ApplyPageProps) {
           color: #00ed64;
           margin: 0;
         }
-        .settings-icon {
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+        .settings-icon, .logout-icon {
           background: none;
           border: none;
           font-size: 20px;
@@ -252,7 +265,7 @@ export default function ApplyPage({ backendUrl, onGenerated }: ApplyPageProps) {
           opacity: 0.7;
           transition: opacity 0.2s;
         }
-        .settings-icon:hover {
+        .settings-icon:hover, .logout-icon:hover {
           opacity: 1;
         }
         .error-message {

@@ -92,6 +92,7 @@ export default function App() {
         <ApplyPage
           backendUrl={state.backendUrl}
           onGenerated={handleGeneratedEmail}
+          onLogout={handleLogout}
         />
       )
 

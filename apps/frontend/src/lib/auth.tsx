@@ -1,5 +1,7 @@
 'use client'
 
+declare const chrome: any
+
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 
 interface User {
@@ -20,36 +22,97 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const API_BASE = 'http://localhost:8000'
 
+async function getExtensionToken(): Promise<string | null> {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return null
+  }
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_TOKEN' })
+    return response?.token || null
+  } catch {
+    return null
+  }
+}
+
+async function setExtensionToken(token: string, email?: string): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return
+  }
+  try {
+    await chrome.runtime.sendMessage({ type: 'SET_TOKEN', token, email })
+  } catch {
+    // Silent fail - extension may not be installed or just installed
+  }
+}
+
+async function clearExtensionToken(): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return
+  }
+  try {
+    await chrome.runtime.sendMessage({ type: 'LOGOUT' })
+  } catch {
+    // Silent fail
+  }
+}
+
+async function validateToken(token: string): Promise<User | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    if (res.ok) {
+      return await res.json()
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+async function resolveToken(): Promise<string | null> {
+  const extToken = await getExtensionToken()
+  if (extToken) {
+    const user = await validateToken(extToken)
+    if (user) {
+      localStorage.setItem('token', extToken)
+      return extToken
+    }
+  }
+
+  const localToken = localStorage.getItem('token')
+  if (localToken) {
+    const user = await validateToken(localToken)
+    if (user) {
+      await setExtensionToken(localToken, user.email)
+      return localToken
+    }
+    localStorage.removeItem('token')
+  }
+
+  return null
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchUser = async () => {
-    const token = localStorage.getItem('token')
+    const token = await resolveToken()
     if (!token) {
       setLoading(false)
       return
     }
 
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (res.ok) {
-        const userData = await res.json()
-        setUser(userData)
-      } else {
-        localStorage.removeItem('token')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
+    const userData = await validateToken(token)
+    if (userData) {
+      setUser(userData)
+    } else {
       localStorage.removeItem('token')
-    } finally {
-      setLoading(false)
     }
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -64,10 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const data = await res.json()
       
-      // Store state for validation
       localStorage.setItem('oauth_state', data.state)
       
-      // Redirect to Google
       window.location.href = data.authorization_url
     } catch (error) {
       console.error('Login failed:', error)
@@ -83,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.removeItem('token')
     localStorage.removeItem('oauth_state')
+    await clearExtensionToken()
     setUser(null)
     window.location.href = '/'
   }
