@@ -4,7 +4,6 @@ GOOGLE_SCOPES = [
     "openid",
     "email",
     "profile",
-    "https://www.googleapis.com/auth/gmail.send"
 ]
 
 TOKEN_EXPIRE_DAYS = 7

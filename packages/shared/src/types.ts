@@ -63,3 +63,38 @@ export interface AuthCallbackResponse {
   email: string
   name?: string
 }
+
+export interface EmailConfig {
+  type: 'google' | 'smtp' | null
+  email?: string
+  host?: string
+  port?: number
+  username?: string
+  from_email?: string
+  configured: boolean
+}
+
+export interface EmailConfigSave {
+  type: 'google' | 'smtp'
+  google?: {
+    refresh_token: string
+    email: string
+  }
+  smtp?: {
+    host: string
+    port: number
+    username: string
+    password: string
+    from_email: string
+    use_tls: boolean
+  }
+}
+
+export interface SmtpTestRequest {
+  host: string
+  port: number
+  username: string
+  password: string
+  from_email?: string
+  use_tls?: boolean
+}

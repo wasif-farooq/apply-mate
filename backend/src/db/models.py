@@ -13,6 +13,7 @@ class User(Base):
     name = Column(String(255))
     picture = Column(String(500))
     refresh_token = Column(String(500), nullable=True)
+    email_config = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

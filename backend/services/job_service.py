@@ -125,13 +125,10 @@ class JobService:
     ) -> dict:
         user = self.user_repo.get_by_id(user_id)
 
-        if not user or not user.refresh_token:
-            raise ValueError("Gmail not connected. Please log in again.")
+        if not user or not user.email_config or not user.email_config.get("type"):
+            raise ValueError("Email not configured. Please configure email settings first.")
 
-        email_service = EmailService(
-            refresh_token=user.refresh_token,
-            from_email=user.email
-        )
+        email_service = EmailService(email_config=user.email_config)
 
         result = email_service.send(
             to_email=to_email,

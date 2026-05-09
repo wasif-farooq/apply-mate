@@ -1,4 +1,4 @@
-import type { ApplyRequest, ApplyResponse, SendRequest, Settings } from './types'
+import type { ApplyRequest, ApplyResponse, SendRequest, Settings, EmailConfig, EmailConfigSave, SmtpTestRequest } from './types'
 
 export class ApiClient {
   private baseUrl: string
@@ -85,6 +85,28 @@ export class ApiClient {
 
   async getHealth(): Promise<{ status: string }> {
     return this.request<{ status: string }>('/health')
+  }
+
+  async getEmailConfig(): Promise<EmailConfig> {
+    return this.request<EmailConfig>('/api/settings/email')
+  }
+
+  async saveEmailConfig(config: EmailConfigSave): Promise<{ status: string; type: string }> {
+    return this.request<{ status: string; type: string }>('/api/settings/email', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    })
+  }
+
+  async connectGoogleEmail(): Promise<{ authorization_url: string; state: string }> {
+    return this.request<{ authorization_url: string; state: string }>('/api/settings/email/connect-google')
+  }
+
+  async testSmtpConnection(smtpConfig: SmtpTestRequest): Promise<{ status: string; email: string }> {
+    return this.request<{ status: string; email: string }>('/api/settings/email/smtp/test', {
+      method: 'POST',
+      body: JSON.stringify(smtpConfig),
+    })
   }
 }
 

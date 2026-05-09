@@ -40,6 +40,12 @@ const DEFAULT_PROVIDERS: Record<string, ProviderState> = {
   google: { enabled: false, config: { url: '', api_key: '' }, models: [] }
 }
 
+const isDev = process.env.NODE_ENV === 'development'
+
+const DEFAULT_PROVIDER_NAMES = isDev
+  ? ['ollama', 'ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go', 'openai', 'anthropic', 'google']
+  : ['ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go', 'openai', 'anthropic', 'google']
+
 export interface UseSettingsReturn {
   loading: boolean
   saving: boolean
@@ -97,11 +103,10 @@ export function useSettings(): UseSettingsReturn {
       setGlobalSelectedModel(globalModel || null)
       setGlobalSelectedProvider(globalProvider || null)
       
-      const newProviders: Record<string, ProviderState> = {}
+const newProviders: Record<string, ProviderState> = {}
       const newExpanded: Record<string, boolean> = {}
-      const providerNames = ['ollama', 'ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go', 'openai', 'anthropic', 'google']
-      
-      for (const name of providerNames) {
+
+      for (const name of DEFAULT_PROVIDER_NAMES) {
         const existingConfig = data.providers?.find((p: ProviderConfig) => p.provider === name)
         const existingModels = data.models?.[name] || []
         

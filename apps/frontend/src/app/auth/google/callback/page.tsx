@@ -14,42 +14,61 @@ export default function CallbackPage() {
       const params = new URLSearchParams(window.location.search)
       const code = params.get('code')
       const state = params.get('state')
-      const storedState = localStorage.getItem('oauth_state')
 
       if (!code || !state) {
         setError('Missing code or state parameter')
         return
       }
 
+      const isEmailFlow = localStorage.getItem('email_oauth_flow') === 'true'
+      const storageKey = isEmailFlow ? 'email_oauth_state' : 'oauth_state'
+      const storedState = localStorage.getItem(storageKey)
+
       if (state !== storedState) {
         setError('Invalid state parameter - possible CSRF attack')
-        localStorage.removeItem('oauth_state')
+        localStorage.removeItem(storageKey)
+        if (isEmailFlow) localStorage.removeItem('email_oauth_flow')
         return
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/auth/callback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ code, state }),
-        })
+        if (isEmailFlow) {
+          const res = await fetch(`${API_BASE}/api/settings/email/callback`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ code, state }),
+          })
 
-        if (!res.ok) {
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.detail || 'Failed to connect Google email')
+          }
+
+          localStorage.removeItem(storageKey)
+          localStorage.removeItem('email_oauth_flow')
+          window.location.href = '/settings?tab=email'
+        } else {
+          const res = await fetch(`${API_BASE}/api/auth/callback`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ code, state }),
+          })
+
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.detail || 'Authentication failed')
+          }
+
           const data = await res.json()
-          throw new Error(data.detail || 'Authentication failed')
+          localStorage.setItem('token', data.token)
+          localStorage.removeItem(storageKey)
+          window.location.href = '/apply'
         }
-
-        const data = await res.json()
-        
-        // Store token
-        localStorage.setItem('token', data.token)
-        localStorage.removeItem('oauth_state')
-        
-        // Use window.location.href instead of router.push() to ensure
-        // full page reload so AuthProvider can properly read the token
-        window.location.href = '/apply'
       } catch (err) {
         console.error('Callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
@@ -92,7 +111,7 @@ export default function CallbackPage() {
       alignItems: 'center',
       justifyContent: 'center'
     }}>
-      <p>Logging you in...</p>
+      <p>Processing...</p>
     </div>
   )
 }

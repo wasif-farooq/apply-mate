@@ -140,11 +140,14 @@ def send_job_email(
 ):
     logger.info(f"[API] Sending email to: {request.to_email}")
 
-    if not current_user.refresh_token:
-        logger.error(f"[API] No refresh token for user {current_user.id}")
+    user_repo = UserRepository(db)
+    user = user_repo.get_by_id(current_user.id)
+
+    if not user.email_config or not user.email_config.get("type"):
+        logger.error(f"[API] No email config for user {current_user.id}")
         raise HTTPException(
             status_code=401,
-            detail="Gmail not connected. Please log in again to authorize email sending."
+            detail="Email not configured. Please configure email settings first."
         )
 
     user_repo = UserRepository(db)

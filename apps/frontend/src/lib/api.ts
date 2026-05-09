@@ -224,3 +224,84 @@ export async function deleteApplication(id: number): Promise<void> {
     throw new Error('Failed to delete application')
   }
 }
+
+export interface EmailConfig {
+  type: 'google' | 'smtp' | null
+  email?: string
+  host?: string
+  port?: number
+  username?: string
+  from_email?: string
+  configured: boolean
+}
+
+export interface EmailConfigSave {
+  type: 'google' | 'smtp'
+  google?: {
+    refresh_token: string
+    email: string
+  }
+  smtp?: {
+    host: string
+    port: number
+    username: string
+    password: string
+    from_email: string
+    use_tls: boolean
+  }
+}
+
+export async function getEmailConfig(): Promise<EmailConfig> {
+  const response = await fetch(`${API_BASE}/api/settings/email`, {
+    headers: getHeaders()
+  })
+  if (!response.ok) {
+    throw new Error('Failed to get email config')
+  }
+  return response.json()
+}
+
+export async function saveEmailConfig(config: EmailConfigSave): Promise<{ status: string; type: string }> {
+  const response = await fetch(`${API_BASE}/api/settings/email`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(config)
+  })
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.detail || 'Failed to save email config')
+  }
+  return response.json()
+}
+
+export async function connectGoogleEmail(): Promise<{ authorization_url: string; state: string }> {
+  const response = await fetch(`${API_BASE}/api/settings/email/connect-google`, {
+    headers: getHeaders()
+  })
+  if (!response.ok) {
+    throw new Error('Failed to connect Google email')
+  }
+  return response.json()
+}
+
+export interface SmtpTestRequest {
+  host: string
+  port: number
+  username: string
+  password: string
+  from_email?: string
+  use_tls?: boolean
+}
+
+export async function testSmtpConnection(smtpConfig: SmtpTestRequest): Promise<{ status: string; email: string }> {
+  const response = await fetch(`${API_BASE}/api/settings/email/smtp/test`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(smtpConfig)
+  })
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.detail || 'Failed to test SMTP connection')
+  }
+  return response.json()
+}
