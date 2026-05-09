@@ -1,5 +1,5 @@
 {
-  "name": "applymate",
+  "name": "applybuddy",
   "private": true,
   "workspaces": [
     "packages/*",

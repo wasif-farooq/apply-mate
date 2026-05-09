@@ -70,7 +70,7 @@ export default function LoginPage({ backendUrl, onLogin }: LoginPageProps) {
   return (
     <div className="login-page">
       <div className="login-header">
-        <h1>ApplyMate</h1>
+        <h1>ApplyBuddy</h1>
         <p>Sign in to start applying</p>
       </div>
 

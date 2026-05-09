@@ -3,7 +3,7 @@ import { AuthProvider } from '@/lib/auth'
 import '@/styles/globals.css'
 
 export const metadata: Metadata = {
-  title: 'ApplyMate - AI Job Application Assistant',
+  title: 'ApplyBuddy - AI Job Application Assistant',
   description: 'Automate your job applications with AI',
 }
 

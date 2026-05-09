@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import { LogoIcon } from '@applybuddy/ui'
 
 export default function Home() {
   const { user, signIn, signOut, loading } = useAuth()
@@ -38,8 +39,9 @@ export default function Home() {
           alignItems: 'center',
           marginBottom: '40px'
         }}>
-          <Link href="/" style={{ color: '#fff', textDecoration: 'none' }}>
-            <span style={{ fontSize: '18px', fontWeight: 500 }}>ApplyMate</span>
+          <Link href="/" style={{ color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <LogoIcon style={{ width: '24px', height: '24px' }} />
+            <span style={{ fontSize: '18px', fontWeight: 500 }}>ApplyBuddy</span>
           </Link>
           
           {user ? (
@@ -85,9 +87,14 @@ export default function Home() {
             fontSize: '56px',
             fontWeight: 500,
             marginBottom: '20px',
-            letterSpacing: '-1px'
+            letterSpacing: '-1px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px'
           }}>
-            ApplyMate
+            <LogoIcon style={{ width: '64px', height: '64px' }} />
+            ApplyBuddy
           </h1>
           <p style={{
             fontSize: '20px',
@@ -127,7 +134,7 @@ export default function Home() {
             padding: '14px 32px',
             borderColor: '#1c2d38',
             color: '#ffffff'
-          }}>
+          }} onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>
             Learn More
           </button>
         </div>
@@ -172,6 +179,337 @@ export default function Home() {
             </p>
           </div>
         </div>
+
+        {/* How It Works */}
+        <div id="how-it-works" style={{ marginTop: '80px' }}>
+          <h2 style={{
+            fontSize: '36px',
+            fontWeight: 500,
+            textAlign: 'center',
+            marginBottom: '40px'
+          }}>
+            How It Works
+          </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '20px',
+            maxWidth: '900px',
+            margin: '0 auto'
+          }}>
+            <div style={{ textAlign: 'center', padding: '16px' }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(0,237,100,0.1)',
+                border: '2px solid #00ed64',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+                fontSize: '24px'
+              }}>
+                🔗
+              </div>
+              <h4 style={{ color: '#fff', marginBottom: '6px', fontSize: '14px' }}>1. Paste LinkedIn URL</h4>
+              <p style={{ color: '#a8b3bc', fontSize: '12px', lineHeight: '1.4' }}>
+                Copy the job post link from LinkedIn
+              </p>
+            </div>
+            <div style={{ textAlign: 'center', padding: '16px' }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(0,237,100,0.1)',
+                border: '2px solid #00ed64',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+                fontSize: '24px'
+              }}>
+                📄
+              </div>
+              <h4 style={{ color: '#fff', marginBottom: '6px', fontSize: '14px' }}>2. Upload Resume</h4>
+              <p style={{ color: '#a8b3bc', fontSize: '12px', lineHeight: '1.4' }}>
+                Attach your resume to personalize
+              </p>
+            </div>
+            <div style={{ textAlign: 'center', padding: '16px' }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(0,237,100,0.1)',
+                border: '2px solid #00ed64',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+                fontSize: '24px'
+              }}>
+                ✨
+              </div>
+              <h4 style={{ color: '#fff', marginBottom: '6px', fontSize: '14px' }}>3. AI Generates Email</h4>
+              <p style={{ color: '#a8b3bc', fontSize: '12px', lineHeight: '1.4' }}>
+                Creates personalized, professional email
+              </p>
+            </div>
+            <div style={{ textAlign: 'center', padding: '16px' }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(0,237,100,0.1)',
+                border: '2px solid #00ed64',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+                fontSize: '24px'
+              }}>
+                🚀
+              </div>
+              <h4 style={{ color: '#fff', marginBottom: '6px', fontSize: '14px' }}>4. Send & Apply</h4>
+              <p style={{ color: '#a8b3bc', fontSize: '12px', lineHeight: '1.4' }}>
+                Review and send your application
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Use Cases */}
+        <div style={{ marginTop: '80px' }}>
+          <h2 style={{
+            fontSize: '36px',
+            fontWeight: 500,
+            textAlign: 'center',
+            marginBottom: '40px'
+          }}>
+            Who It's For
+          </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '20px'
+          }}>
+            <div style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '12px',
+              padding: '24px'
+            }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>🎯</div>
+              <h4 style={{ color: '#fff', marginBottom: '8px' }}>Active Job Seekers</h4>
+              <p style={{ color: '#a8b3bc', fontSize: '14px' }}>
+                Applying to multiple positions daily and need to scale your outreach
+              </p>
+            </div>
+            <div style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '12px',
+              padding: '24px'
+            }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>🔄</div>
+              <h4 style={{ color: '#fff', marginBottom: '8px' }}>Career Changers</h4>
+              <p style={{ color: '#a8b3bc', fontSize: '14px' }}>
+                Targeting new industries and want tailored applications for each role
+              </p>
+            </div>
+            <div style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '12px',
+              padding: '24px'
+            }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>🏢</div>
+              <h4 style={{ color: '#fff', marginBottom: '8px' }}>Company Hunters</h4>
+              <p style={{ color: '#a8b3bc', fontSize: '14px' }}>
+                Focusing on specific companies and need personalized, standout pitches
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Benefits */}
+        <div style={{ marginTop: '80px', marginBottom: '40px' }}>
+          <h2 style={{
+            fontSize: '36px',
+            fontWeight: 500,
+            textAlign: 'center',
+            marginBottom: '40px'
+          }}>
+            Why ApplyBuddy
+          </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '20px',
+            maxWidth: '700px',
+            margin: '0 auto'
+          }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '16px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(0,237,100,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <span style={{ fontSize: '20px' }}>⏱️</span>
+              </div>
+              <div>
+                <h4 style={{ color: '#fff', marginBottom: '4px', fontSize: '14px' }}>Save 15+ Minutes</h4>
+                <p style={{ color: '#a8b3bc', fontSize: '12px', lineHeight: '1.4' }}>
+                  No more starting from scratch - generate polished emails instantly
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '16px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(0,237,100,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <span style={{ fontSize: '20px' }}>💌</span>
+              </div>
+              <div>
+                <h4 style={{ color: '#fff', marginBottom: '4px', fontSize: '14px' }}>Personalized at Scale</h4>
+                <p style={{ color: '#a8b3bc', fontSize: '12px', lineHeight: '1.4' }}>
+                  Every email is tailored to the specific job - not generic templates
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '16px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(0,237,100,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <span style={{ fontSize: '20px' }}>🔒</span>
+              </div>
+              <div>
+                <h4 style={{ color: '#fff', marginBottom: '4px', fontSize: '14px' }}>You Stay in Control</h4>
+                <p style={{ color: '#a8b3bc', fontSize: '12px', lineHeight: '1.4' }}>
+                  Preview and edit every email before sending - full approval workflow
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '16px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(0,237,100,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <span style={{ fontSize: '20px' }}>📊</span>
+              </div>
+              <div>
+                <h4 style={{ color: '#fff', marginBottom: '4px', fontSize: '14px' }}>Track All Applications</h4>
+                <p style={{ color: '#a8b3bc', fontSize: '12px', lineHeight: '1.4' }}>
+                  Keep track of every application - never miss a follow-up
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Coming Soon */}
+        <div style={{ marginTop: '80px' }}>
+          <div style={{
+            background: 'rgba(0,237,100,0.05)',
+            border: '1px solid rgba(0,237,100,0.2)',
+            borderRadius: '16px',
+            padding: '32px'
+          }}>
+            <h2 style={{
+              fontSize: '28px',
+              fontWeight: 500,
+              textAlign: 'center',
+              marginBottom: '8px'
+            }}>
+              What's Coming Next
+            </h2>
+            <p style={{
+              color: '#a8b3bc',
+              textAlign: 'center',
+              marginBottom: '32px',
+              fontSize: '16px'
+            }}>
+              We're building the future of automated job applications
+            </p>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '24px'
+            }}>
+              <div style={{
+                background: 'rgba(0,0,0,0.2)',
+                borderRadius: '12px',
+                padding: '24px'
+              }}>
+                <div style={{ fontSize: '32px', marginBottom: '16px' }}>🔗</div>
+                <h4 style={{ color: '#fff', marginBottom: '8px' }}>LinkedIn Easy Apply</h4>
+                <p style={{ color: '#a8b3bc', fontSize: '14px' }}>
+                  Process LinkedIn posts with Easy Apply button directly. Apply without leaving the platform.
+                </p>
+              </div>
+              <div style={{
+                background: 'rgba(0,0,0,0.2)',
+                borderRadius: '12px',
+                padding: '24px'
+              }}>
+                <div style={{ fontSize: '32px', marginBottom: '16px' }}>🤖</div>
+                <h4 style={{ color: '#fff', marginBottom: '8px' }}>AI Form Filling</h4>
+                <p style={{ color: '#a8b3bc', fontSize: '14px' }}>
+                  Automatically fill out application forms using your configured AI. Upload resume, let AI handle the rest.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer style={{
+          borderTop: '1px solid #1c2d38',
+          padding: '32px 0',
+          marginTop: '60px',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            marginBottom: '8px'
+          }}>
+            <LogoIcon style={{ width: '20px', height: '20px' }} />
+            <span style={{ color: '#fff', fontSize: '16px', fontWeight: 500 }}>ApplyBuddy</span>
+          </div>
+          <p style={{ color: '#6b7280', fontSize: '14px' }}>
+            © 2025 ApplyBuddy. All rights reserved.
+          </p>
+        </footer>
 
       </div>
     </div>

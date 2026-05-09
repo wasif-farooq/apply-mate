@@ -1,8 +1,8 @@
-# ApplyMate
+# ApplyBuddy
 
 AI-powered job application assistant that automates applying to jobs via LinkedIn posts.
 
-> Your friendly AI assistant for automating job applications!
+> Your friendly AI buddy for automating job applications!
 
 ## Features
 

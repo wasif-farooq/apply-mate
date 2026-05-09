@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { useSettings, PROVIDER_LABELS } from '@/hooks/useSettings'
 import { useEmailSettings } from '@/hooks/useEmailSettings'
-import { Header } from '@applymate/ui'
+import { Header } from '@applybuddy/ui'
 import { useAuth, getToken } from '@/lib/auth'
 
 function ActiveConfig({ activeProvider }: { activeProvider: [string, any] | undefined }) {
@@ -1001,7 +1001,8 @@ export default function SettingsPage() {
       color: '#ffffff'
     }}>
       <Header 
-        logo="ApplyMate"
+        logo="ApplyBuddy"
+        showLogoIcon={true}
         rightElement={
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>

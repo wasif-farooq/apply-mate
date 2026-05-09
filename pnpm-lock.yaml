@@ -14,7 +14,7 @@ importers:
 
   apps/extension:
     dependencies:
-      '@applymate/ui':
+      '@applybuddy/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       dompurify:
@@ -51,10 +51,10 @@ importers:
 
   apps/frontend:
     dependencies:
-      '@applymate/shared':
+      '@applybuddy/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@applymate/ui':
+      '@applybuddy/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@tiptap/extension-image':

@@ -3,17 +3,17 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16
-    container_name: applymate-db
+    container_name: applybuddy-db
     environment:
-      POSTGRES_USER: applymate
-      POSTGRES_PASSWORD: applymate123
-      POSTGRES_DB: applymate
+      POSTGRES_USER: applybuddy
+      POSTGRES_PASSWORD: applybuddy123
+      POSTGRES_DB: applybuddy
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U applymate"]
+      test: ["CMD-SHELL", "pg_isready -U applybuddy"]
       interval: 5s
       timeout: 5s
       retries: 5

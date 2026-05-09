@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { StepIndicator, ProcessingState } from '@applymate/ui'
+import { StepIndicator, ProcessingState, LogoIcon } from '@applybuddy/ui'
 
 interface ApplyPageProps {
   backendUrl: string
@@ -138,7 +138,7 @@ export default function ApplyPage({ backendUrl, onGenerated, onLogout }: ApplyPa
   return (
     <div className="apply-page">
       <div className="header">
-        <h1>ApplyMate</h1>
+        <h1><LogoIcon style={{ width: '24px', height: '24px', verticalAlign: 'middle', marginRight: '8px' }} />ApplyBuddy</h1>
         <div className="header-actions">
           {onLogout && (
             <button className="logout-icon" onClick={onLogout} title="Sign Out">

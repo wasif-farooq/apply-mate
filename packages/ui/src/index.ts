@@ -8,5 +8,6 @@ export { EmailPreview } from './components/EmailPreview'
 export { JobDetailsCard } from './components/JobDetailsCard'
 export { Header } from './components/Header'
 export { ProcessingState } from './components/ProcessingState'
+export { LogoIcon } from './components/LogoIcon'
 
 export * from './styles/tokens'

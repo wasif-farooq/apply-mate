@@ -74,7 +74,7 @@ export default function SettingsPage({ backendUrl, onBackendUrlChange, onLogout,
 
       <div className="section">
         <h2>Backend URL</h2>
-        <p className="hint">The URL of your ApplyMate backend server</p>
+        <p className="hint">The URL of your ApplyBuddy backend server</p>
 
         <div className="input-row">
           <input
@@ -99,7 +99,7 @@ export default function SettingsPage({ backendUrl, onBackendUrlChange, onLogout,
 
       <div className="section">
         <h2>About</h2>
-        <p className="hint">ApplyMate Chrome Extension v1.0.0</p>
+        <p className="hint">ApplyBuddy Chrome Extension v1.0.0</p>
       </div>
 
       <style>{settingsStyles}</style>

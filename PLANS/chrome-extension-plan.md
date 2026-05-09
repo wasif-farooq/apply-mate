@@ -1,9 +1,9 @@
-# ApplyMate Chrome Extension + Shared UI Plan
+# ApplyBuddy Chrome Extension + Shared UI Plan
 
 ## Overview
 
-Transform ApplyMate into a **monorepo** with:
-- **Shared React component library** (`@applymate/ui`)
+Transform ApplyBuddy into a **monorepo** with:
+- **Shared React component library** (`@applybuddy/ui`)
 - **Next.js frontend** (existing)
 - **React-based Chrome extension** (new)
 

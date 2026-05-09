@@ -1,12 +1,14 @@
 import { colors, spacing, fontSize } from '../styles/tokens'
+import { LogoIcon } from './LogoIcon'
 
 interface HeaderProps {
   _title?: string
   logo?: string
+  showLogoIcon?: boolean
   rightElement?: React.ReactNode
 }
 
-export function Header({ logo = 'ApplyMate', rightElement }: HeaderProps) {
+export function Header({ logo = 'ApplyBuddy', showLogoIcon = false, rightElement }: HeaderProps) {
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
@@ -16,7 +18,18 @@ export function Header({ logo = 'ApplyMate', rightElement }: HeaderProps) {
     borderBottom: `1px solid ${colors.border}`,
   }
 
-  const logoStyle: React.CSSProperties = {
+  const logoContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+  }
+
+  const logoIconStyle: React.CSSProperties = {
+    width: '28px',
+    height: '28px',
+  }
+
+  const logoTextStyle: React.CSSProperties = {
     fontSize: fontSize.lg,
     fontWeight: 600,
     color: colors.accent.primary,
@@ -31,7 +44,10 @@ export function Header({ logo = 'ApplyMate', rightElement }: HeaderProps) {
 
   return (
     <header style={containerStyle}>
-      <span style={logoStyle}>{logo}</span>
+      <div style={logoContainerStyle}>
+        {showLogoIcon && <LogoIcon style={logoIconStyle} />}
+        <span style={logoTextStyle}>{logo}</span>
+      </div>
       {rightElement && <div style={rightStyle}>{rightElement}</div>}
     </header>
   )

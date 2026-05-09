@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { useApplications } from '@/hooks/useApplications'
-import { Header } from '@applymate/ui'
+import { Header } from '@applybuddy/ui'
 import { useAuth } from '@/lib/auth'
 
 function StatsGrid({ stats }: { stats: { total: number; sent: number; generated: number; failed: number } | null }) {
@@ -249,7 +249,8 @@ export default function HistoryPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#001e2b', color: '#ffffff' }}>
       <Header 
-        logo="ApplyMate"
+        logo="ApplyBuddy"
+        showLogoIcon={true}
         rightElement={
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>

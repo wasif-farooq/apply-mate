@@ -1,4 +1,4 @@
-# ApplyMate Chrome Extension
+# ApplyBuddy Chrome Extension
 
 A Chrome extension that provides a full job application workflow directly in your browser popup.
 
@@ -9,7 +9,7 @@ A Chrome extension that provides a full job application workflow directly in you
 - **Resume Upload** - Upload your resume directly in the extension
 - **AI Email Generation** - Generates personalized application emails
 - **Email Preview & Edit** - Review and edit before sending
-- **Configurable Backend** - Connect to your own ApplyMate backend
+- **Configurable Backend** - Connect to your own ApplyBuddy backend
 
 ## Architecture
 
@@ -63,7 +63,7 @@ This starts Vite in watch mode. After making changes, rebuild the extension and 
 
 ## Backend Requirements
 
-The extension requires a running ApplyMate backend. By default, it connects to:
+The extension requires a running ApplyBuddy backend. By default, it connects to:
 - Development: `http://localhost:8000`
 - Production: Configure your deployed backend URL in extension settings
 

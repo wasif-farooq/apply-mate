@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { useApplyFlow, cleanEmailHTML } from '@/hooks/useApplyFlow'
 import { useAuth } from '@/lib/auth'
-import { StepIndicator, JobDetailsCard, ProcessingState, Header } from '@applymate/ui'
+import { StepIndicator, JobDetailsCard, ProcessingState, Header } from '@applybuddy/ui'
 import DOMPurify from 'dompurify'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -599,7 +599,8 @@ export default function ApplyPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#001e2b', color: '#ffffff' }}>
       <Header 
-        logo="ApplyMate"
+        logo="ApplyBuddy"
+        showLogoIcon={true}
         rightElement={
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {navItems.map(item => (

@@ -1,4 +1,4 @@
-# ApplyMate - Agent Instructions
+# ApplyBuddy - Agent Instructions
 
 ## Project Overview
 AI-powered job application assistant that automates applying to jobs via LinkedIn posts.

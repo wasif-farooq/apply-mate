@@ -44,7 +44,7 @@ def startup():
 
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "ApplyMate API is running"}
+    return {"status": "ok", "message": "ApplyBuddy API is running"}
 
 
 @app.get("/health")

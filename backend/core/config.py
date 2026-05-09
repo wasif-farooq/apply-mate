@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # App
-    APP_NAME: str = "ApplyMate API"
+    APP_NAME: str = "ApplyBuddy API"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql://applymate:applymate123@localhost:5432/applymate"
+        "postgresql://applybuddy:applybuddy123@localhost:5432/applybuddy"
     )
 
     # AI Provider defaults

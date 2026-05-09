@@ -1,5 +1,5 @@
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('ApplyMate extension installed')
+  console.log('ApplyBuddy extension installed')
 
   chrome.storage.local.set({
     backend_url: 'http://localhost:8000',

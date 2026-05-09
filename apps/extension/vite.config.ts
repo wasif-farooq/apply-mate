@@ -17,8 +17,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
-      '@applymate/ui': resolve(__dirname, '../../packages/ui/src'),
-      '@applymate/shared': resolve(__dirname, '../../packages/shared/src'),
+      '@applybuddy/ui': resolve(__dirname, '../../packages/ui/src'),
+      '@applybuddy/shared': resolve(__dirname, '../../packages/shared/src'),
     },
   },
 })
