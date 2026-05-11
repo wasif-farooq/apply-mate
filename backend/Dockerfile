@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Making directories
 RUN mkdir -p uploads logs
 
 ENV PYTHONPATH=/app
