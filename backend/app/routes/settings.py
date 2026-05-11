@@ -129,28 +129,7 @@ def fetch_ollama_cloud_models(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    try:
-        headers = {"Authorization": f"Bearer {body.api_key}"}
-        response = requests.get(
-            "https://cloud.ollama.com/api/tags",
-            headers=headers,
-            timeout=30
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
-
-            provider_repo = ProviderRepository(db)
-            all_models = provider_repo.merge_models(current_user.id, "ollama_cloud", models)
-            return {"models": all_models}
-        elif response.status_code == 401:
-            raise HTTPException(status_code=401, detail="Invalid API key")
-        else:
-            raise HTTPException(status_code=response.status_code, detail=f"Failed: {response.text}")
-    except requests.RequestException as e:
-        logger.error(f"[Settings] Ollama Cloud fetch failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=501, detail="Ollama Cloud is temporarily unavailable")
 
 
 @router.get("/models/fetch-ollama")
@@ -232,7 +211,10 @@ def fetch_opencode_models(
     db_provider = f"opencode_{provider_type}"
 
     try:
-        base_url = f"https://opencode.ai/zen/{provider_type}/v1"
+        if provider_type == "zen":
+            base_url = "https://opencode.ai/zen/v1"
+        else:
+            base_url = "https://opencode.ai/zen/go/v1"
         headers = {"Authorization": f"Bearer {body.api_key}"}
         response = requests.get(f"{base_url}/models", headers=headers, timeout=30)
 

@@ -231,6 +231,88 @@ curl https://api.applybuddy.net/health
 **Cause**: Railway trial period ended
 **Solution**: Select a paid plan at railway.app/account
 
+#### Issue: Security Vulnerabilities Block Deployment
+**Cause**: Railway scans entire repo and finds vulnerable packages (e.g., next@14.2.3 CVEs)
+**Solution**:
+1. Create `.railwayignore` to exclude problematic directories
+2. Or fix the vulnerable package in the source (e.g., upgrade Next.js in package.json and regenerate lockfile)
+3. Commit and push, Railway auto-deploys from GitHub
+
+#### Issue: "failed to read Dockerfile at 'Dockerfile'"
+**Cause**: Root directory misconfigured - Railway can't find Dockerfile relative to root
+**Solution**:
+1. Set `root_directory` to `backend` (or correct subdirectory containing Dockerfile)
+2. Use Railway dashboard or CLI: `railway update --root-directory backend`
+3. Commit and push to trigger fresh deploy from GitHub
+
+#### Issue: Railwayignore Not Working
+**Cause**: `.railwayignore` only affects security scan, not Dockerfile discovery
+**Solution**: Always ensure `root_directory` points to correct location containing Dockerfile
+
+---
+
+### Fresh Railway Backend Deployment Checklist
+
+Use when deploying backend from scratch or after major changes.
+
+#### Pre-Deployment
+- [ ] Ensure `backend/Dockerfile` exists and is valid
+- [ ] Check `apps/frontend/package.json` for vulnerable dependencies (e.g., next.js version)
+- [ ] Update any packages with known CVEs before deploying
+- [ ] Generate new JWT_SECRET: `openssl rand -base64 32`
+- [ ] Ensure Railway project has PostgreSQL service running
+
+#### Deployment Steps (MCP Tools)
+```python
+# 1. Get project info
+railway_list_projects()  # Find project_id: 1fe240d9-8154-4af7-91ac-4c755c47386a
+railway_list_services()  # Find backend service_id
+
+# 2. Generate and set JWT_SECRET
+openssl rand -base64 32  # Generate secret
+railway_set_variables(
+  project_id="1fe240d9-8154-4af7-91ac-4c755c47386a",
+  service_id="331db7b6-9385-47ef-b4f9-76de6bb506d9",
+  variables={"JWT_SECRET": "generated-secret"}
+)
+
+# 3. Configure service settings
+railway_update_service(
+  project_id="1fe240d9-8154-4af7-91ac-4c755c47386a",
+  service_id="331db7b6-9385-47ef-b4f9-76de6bb506d9",
+  root_directory="backend"  # Critical - points to Dockerfile location
+)
+
+# 4. Push code to GitHub (Railway deploys from GitHub source)
+git add . && git commit -m "deploy: fresh backend deploy" && git push
+
+# 5. Or deploy directly via CLI
+railway_deploy(
+  project_id="1fe240d9-8154-4af7-91ac-4c755c47386a",
+  service_id="331db7b6-9385-47ef-b4f9-76de6bb506d9",
+  message="deploy message"
+)
+```
+
+#### Post-Deployment Verification
+```bash
+# Check status
+railway_environment_status(project_id="1fe240d9-...")
+
+# Check logs
+railway_get_logs(deployment_id="...", log_type="build")
+railway_get_logs(deployment_id="...", log_type="deploy")
+
+# Verify health endpoint
+curl https://backend-api-production-xxxx.up.railway.app/health
+```
+
+#### User Configuration (in Railway Dashboard)
+After deploy, user must add their own credentials:
+- `AI_PROVIDER` (openai/anthropic/google)
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY`
+- `GMAIL_EMAIL` + `GMAIL_APP_PASSWORD` (optional)
+
 ---
 
 ### Cost Estimate (Railway)
