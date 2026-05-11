@@ -1,6 +1,46 @@
-import { getToken } from './auth'
+import { getToken, refreshToken } from './auth'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+let isRefreshing = false
+let refreshPromise: Promise<boolean> | null = null
+
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = getToken()
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  }
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(url, { ...options, headers })
+
+  if (response.status === 401) {
+    if (!isRefreshing) {
+      isRefreshing = true
+      refreshPromise = refreshToken()
+    }
+
+    const refreshed = await refreshPromise
+    isRefreshing = false
+    refreshPromise = null
+
+    if (refreshed) {
+      const newToken = getToken()
+      if (newToken) {
+        (headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`
+        return fetch(url, { ...options, headers })
+      }
+    }
+
+    localStorage.removeItem('token')
+    window.location.href = '/'
+  }
+
+  return response
+}
 
 function getHeaders(): HeadersInit {
   const token = getToken()
@@ -97,7 +137,7 @@ export interface ModelConfig {
 }
 
 export async function getSettings(): Promise<Settings> {
-  const response = await fetch(`${API_BASE}/api/settings`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/settings`, {
     headers: getHeaders()
   })
   if (!response.ok) {
@@ -107,7 +147,7 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function updateProviderConfig(provider: string, enabled: boolean, config: Record<string, string>): Promise<ProviderConfig> {
-  const response = await fetch(`${API_BASE}/api/settings/providers/${provider}`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/settings/providers/${provider}`, {
     method: 'PUT',
     headers: getHeaders(),
     body: JSON.stringify({ enabled, config })
@@ -119,7 +159,7 @@ export async function updateProviderConfig(provider: string, enabled: boolean, c
 }
 
 export async function updateProviderModels(provider: string, models: { model_name: string; is_default: boolean }[]): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/settings/models/${provider}`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/settings/models/${provider}`, {
     method: 'PUT',
     headers: getHeaders(),
     body: JSON.stringify({ models })
@@ -130,7 +170,7 @@ export async function updateProviderModels(provider: string, models: { model_nam
 }
 
 export async function updateGlobalSelection(provider: string, model: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/settings/selection`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/settings/selection`, {
     method: 'PUT',
     headers: getHeaders(),
     body: JSON.stringify({ provider, model })
@@ -141,7 +181,7 @@ export async function updateGlobalSelection(provider: string, model: string): Pr
 }
 
 export async function applyToJob(data: ApplyRequest): Promise<ApplyResponse> {
-  const response = await fetch(`${API_BASE}/api/apply`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/apply`, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(data),
@@ -156,7 +196,7 @@ export async function applyToJob(data: ApplyRequest): Promise<ApplyResponse> {
 }
 
 export async function sendEmail(data: SendRequest): Promise<{ status: string; message: string }> {
-  const response = await fetch(`${API_BASE}/api/send`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/send`, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(data),
@@ -189,12 +229,8 @@ export async function uploadResume(file: File): Promise<{ status: string; path: 
 }
 
 export async function getResumes(): Promise<Resume[]> {
-  const token = getToken()
-  const response = await fetch(`${API_BASE}/api/resumes`, {
-    headers: {
-      ...getHeaders(),
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
+  const response = await fetchWithAuth(`${API_BASE}/api/resumes`, {
+    headers: getHeaders(),
   })
 
   if (!response.ok) {
@@ -205,13 +241,9 @@ export async function getResumes(): Promise<Resume[]> {
 }
 
 export async function setDefaultResume(resumeId: number): Promise<Resume> {
-  const token = getToken()
-  const response = await fetch(`${API_BASE}/api/resumes/${resumeId}/set-default`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/resumes/${resumeId}/set-default`, {
     method: 'POST',
-    headers: {
-      ...getHeaders(),
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
+    headers: getHeaders(),
   })
 
   if (!response.ok) {
@@ -222,13 +254,9 @@ export async function setDefaultResume(resumeId: number): Promise<Resume> {
 }
 
 export async function deleteResume(resumeId: number): Promise<void> {
-  const token = getToken()
-  const response = await fetch(`${API_BASE}/api/resumes/${resumeId}`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/resumes/${resumeId}`, {
     method: 'DELETE',
-    headers: {
-      ...getHeaders(),
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
+    headers: getHeaders(),
   })
 
   if (!response.ok) {
@@ -249,7 +277,7 @@ export async function getApplications(
   const params = new URLSearchParams({ page: String(page), limit: String(limit) })
   if (status) params.append('status', status)
   
-  const response = await fetch(`${API_BASE}/api/applications?${params}`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/applications?${params}`, {
     headers: getHeaders()
   })
   if (!response.ok) {
@@ -259,7 +287,7 @@ export async function getApplications(
 }
 
 export async function getApplicationStats(): Promise<ApplicationStats> {
-  const response = await fetch(`${API_BASE}/api/applications/stats`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/applications/stats`, {
     headers: getHeaders()
   })
   if (!response.ok) {
@@ -269,7 +297,7 @@ export async function getApplicationStats(): Promise<ApplicationStats> {
 }
 
 export async function getApplication(id: number): Promise<Application> {
-  const response = await fetch(`${API_BASE}/api/applications/${id}`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/applications/${id}`, {
     headers: getHeaders()
   })
   if (!response.ok) {
@@ -279,7 +307,7 @@ export async function getApplication(id: number): Promise<Application> {
 }
 
 export async function deleteApplication(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/applications/${id}`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/applications/${id}`, {
     method: 'DELETE',
     headers: getHeaders()
   })
@@ -315,7 +343,7 @@ export interface EmailConfigSave {
 }
 
 export async function getEmailConfig(): Promise<EmailConfig> {
-  const response = await fetch(`${API_BASE}/api/settings/email`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/settings/email`, {
     headers: getHeaders()
   })
   if (!response.ok) {
@@ -325,7 +353,7 @@ export async function getEmailConfig(): Promise<EmailConfig> {
 }
 
 export async function saveEmailConfig(config: EmailConfigSave): Promise<{ status: string; type: string }> {
-  const response = await fetch(`${API_BASE}/api/settings/email`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/settings/email`, {
     method: 'PUT',
     headers: getHeaders(),
     body: JSON.stringify(config)
@@ -338,7 +366,7 @@ export async function saveEmailConfig(config: EmailConfigSave): Promise<{ status
 }
 
 export async function connectGoogleEmail(): Promise<{ authorization_url: string; state: string }> {
-  const response = await fetch(`${API_BASE}/api/settings/email/connect-google`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/settings/email/connect-google`, {
     headers: getHeaders()
   })
   if (!response.ok) {
@@ -357,7 +385,7 @@ export interface SmtpTestRequest {
 }
 
 export async function testSmtpConnection(smtpConfig: SmtpTestRequest): Promise<{ status: string; email: string }> {
-  const response = await fetch(`${API_BASE}/api/settings/email/smtp/test`, {
+  const response = await fetchWithAuth(`${API_BASE}/api/settings/email/smtp/test`, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(smtpConfig)

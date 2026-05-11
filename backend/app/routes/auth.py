@@ -1,4 +1,5 @@
 import logging
+import requests
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.deps import get_db, get_current_user
 from app.exceptions import AuthenticationError
 from core.config import get_settings
-from core.security import create_access_token
+from core.security import create_access_token, decode_token
 from models import User
 from models.schemas import UserWithToken
 from repositories.user_repo import UserRepository
@@ -76,3 +77,53 @@ def auth_me(current_user: User = Depends(get_current_user)):
         "name": current_user.name,
         "picture": current_user.picture
     }
+
+
+@router.post("/refresh")
+def auth_refresh(request: Request, db: Session = Depends(get_db)):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+
+    token = auth_header.replace("Bearer ", "")
+    payload = decode_token(token)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    if not user.refresh_token:
+        logger.warning(f"[Auth] No refresh token for user {user_id}")
+        raise HTTPException(status_code=401, detail="Session expired. Please login again.")
+
+    client_id = settings.EXTENSION_GOOGLE_CLIENT_ID or settings.GOOGLE_CLIENT_ID
+    client_secret = settings.EXTENSION_GOOGLE_CLIENT_SECRET or settings.GOOGLE_CLIENT_SECRET
+
+    try:
+        token_response = requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": user.refresh_token,
+                "grant_type": "refresh_token"
+            }
+        )
+        token_response.raise_for_status()
+        new_token_data = token_response.json()
+
+        new_refresh_token = new_token_data.get("refresh_token")
+        if new_refresh_token:
+            user.refresh_token = new_refresh_token
+            db.commit()
+
+        new_access_token = create_access_token(user.id)
+        logger.info(f"[Auth] Token refreshed for user {user.email}")
+        return {"token": new_access_token}
+
+    except requests.RequestException as e:
+        logger.error(f"[Auth] Failed to refresh token: {e}")
+        raise HTTPException(status_code=401, detail="Session expired. Please login again.")

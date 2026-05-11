@@ -167,3 +167,28 @@ export function useAuth() {
 export function getToken(): string | null {
   return localStorage.getItem('token')
 }
+
+export async function refreshToken(): Promise<boolean> {
+  const token = getToken()
+  if (!token) return false
+
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    if (!res.ok) return false
+
+    const data = await res.json()
+    if (data.token) {
+      localStorage.setItem('token', data.token)
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
