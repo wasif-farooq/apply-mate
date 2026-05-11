@@ -1,4 +1,4 @@
-export const DEFAULT_BACKEND_URL = 'http://localhost:8000'
+export const DEFAULT_BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',

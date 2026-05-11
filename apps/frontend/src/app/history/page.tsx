@@ -17,8 +17,7 @@ function StatsGrid({ stats }: { stats: { total: number; sent: number; generated:
   ]
 
   return (
-    <div style={{
-      display: 'grid',
+    <div className="grid-responsive" style={{
       gridTemplateColumns: 'repeat(4, 1fr)',
       gap: '16px',
       padding: '24px',
@@ -45,7 +44,7 @@ function FilterBar({ filter, onFilterChange }: { filter: string; onFilterChange:
   const filters = ['all', 'sent', 'generated', 'failed']
   
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '0 24px 24px', display: 'flex', gap: '8px' }}>
+    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '0 24px 24px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
       {filters.map((f) => (
         <button
           key={f}
@@ -82,6 +81,7 @@ function ApplicationCard({
 }) {
   return (
     <div
+      className="application-card"
       style={{
         background: 'rgba(255,255,255,0.05)',
         border: '1px solid rgba(255,255,255,0.1)',
@@ -89,11 +89,13 @@ function ApplicationCard({
         padding: '16px 20px',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px'
       }}
     >
-      <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+      <div style={{ flex: '1 1 200px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '18px', fontWeight: 600, color: '#fff' }}>
             {app.title || 'Unknown Title'}
           </span>
@@ -114,7 +116,7 @@ function ApplicationCard({
           {formatDate(app.created_at)}
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         {app.sent_to_email && (
           <span style={{ fontSize: '13px', color: '#00ed64' }}>→ {app.sent_to_email}</span>
         )}
@@ -252,11 +254,13 @@ export default function HistoryPage() {
         logo="ApplyBuddy"
         showLogoIcon={true}
         rightElement={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>
-            <Link href="/history" style={{ color: '#00ed64', textDecoration: 'none', fontSize: '14px' }}>History</Link>
-            <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
-            <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Resumes</Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>
+              <Link href="/history" style={{ color: '#00ed64', textDecoration: 'none', fontSize: '14px' }}>History</Link>
+              <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
+              <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Resumes</Link>
+            </div>
             <button
               onClick={signOut}
               style={{
@@ -266,10 +270,13 @@ export default function HistoryPage() {
                 padding: '6px 12px',
                 borderRadius: '6px',
                 fontSize: '14px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                minWidth: 'auto',
+                minHeight: 'auto',
               }}
             >
-              Sign Out
+              <span className="hide-mobile">Sign Out</span>
+              <span className="hide-desktop">✕</span>
             </button>
           </div>
         }

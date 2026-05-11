@@ -57,10 +57,12 @@ function ResumeList({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            transition: 'all 0.2s'
+            transition: 'all 0.2s',
+            flexWrap: 'wrap',
+            gap: '12px'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 200px' }}>
             <div style={{ fontSize: '24px' }}>📄</div>
             <div>
               <div style={{ fontSize: '15px', fontWeight: 500, color: '#fff' }}>
@@ -212,11 +214,13 @@ export default function ResumesPage() {
         logo="ApplyBuddy"
         showLogoIcon={true}
         rightElement={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>
-            <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>History</Link>
-            <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
-            <Link href="/resumes" style={{ color: '#00ed64', textDecoration: 'none', fontSize: '14px' }}>Resumes</Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>
+              <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>History</Link>
+              <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
+              <Link href="/resumes" style={{ color: '#00ed64', textDecoration: 'none', fontSize: '14px' }}>Resumes</Link>
+            </div>
             <button
               onClick={signOut}
               style={{
@@ -226,10 +230,13 @@ export default function ResumesPage() {
                 padding: '6px 12px',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '14px',
+                minWidth: 'auto',
+                minHeight: 'auto',
               }}
             >
-              Sign Out
+              <span className="hide-mobile">Sign Out</span>
+              <span className="hide-desktop">✕</span>
             </button>
           </div>
         }

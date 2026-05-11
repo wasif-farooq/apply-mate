@@ -8,6 +8,8 @@ import { useEmailSettings } from '@/hooks/useEmailSettings'
 import { Header } from '@applybuddy/ui'
 import { useAuth, getToken } from '@/lib/auth'
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
 function ActiveConfig({ activeProvider }: { activeProvider: [string, any] | undefined }) {
   return (
     <div style={{ 
@@ -926,12 +928,12 @@ export default function SettingsPage() {
       let res, data
 
       if (selectedProvider === 'ollama') {
-        res = await fetch(`http://localhost:8000/api/settings/models/fetch-ollama?url=${encodeURIComponent(baseUrl)}`, {
+        res = await fetch(`${API_BASE}/api/settings/models/fetch-ollama?url=${encodeURIComponent(baseUrl)}`, {
           headers: { 'Authorization': `Bearer ${getToken()}` }
         })
         data = await res.json()
       } else if (selectedProvider === 'ollama_cloud') {
-        res = await fetch('http://localhost:8000/api/settings/models/fetch-ollama-cloud', {
+        res = await fetch(`${API_BASE}/api/settings/models/fetch-ollama-cloud`, {
           method: 'POST',
           headers: { 
             'Authorization': `Bearer ${getToken()}`,
@@ -941,7 +943,7 @@ export default function SettingsPage() {
         })
         data = await res.json()
       } else if (selectedProvider === 'openrouter') {
-        res = await fetch('http://localhost:8000/api/settings/models/fetch-openrouter', {
+        res = await fetch(`${API_BASE}/api/settings/models/fetch-openrouter`, {
           method: 'POST',
           headers: { 
             'Authorization': `Bearer ${getToken()}`,
@@ -951,7 +953,7 @@ export default function SettingsPage() {
         })
         data = await res.json()
       } else if (selectedProvider === 'opencode_zen') {
-        res = await fetch('http://localhost:8000/api/settings/models/fetch-opencode', {
+        res = await fetch(`${API_BASE}/api/settings/models/fetch-opencode`, {
           method: 'POST',
           headers: { 
             'Authorization': `Bearer ${getToken()}`,
@@ -961,7 +963,7 @@ export default function SettingsPage() {
         })
         data = await res.json()
       } else if (selectedProvider === 'opencode_go') {
-        res = await fetch('http://localhost:8000/api/settings/models/fetch-opencode', {
+        res = await fetch(`${API_BASE}/api/settings/models/fetch-opencode`, {
           method: 'POST',
           headers: { 
             'Authorization': `Bearer ${getToken()}`,
@@ -1004,11 +1006,13 @@ export default function SettingsPage() {
         logo="ApplyBuddy"
         showLogoIcon={true}
         rightElement={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>
-            <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>History</Link>
-            <Link href="/settings" style={{ color: '#00ed64', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
-            <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Resumes</Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>
+              <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>History</Link>
+              <Link href="/settings" style={{ color: '#00ed64', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
+              <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Resumes</Link>
+            </div>
             <button 
               onClick={signOut}
               style={{ 
@@ -1018,10 +1022,13 @@ export default function SettingsPage() {
                 padding: '6px 12px',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '14px',
+                minWidth: 'auto',
+                minHeight: 'auto',
               }}
             >
-              Sign Out
+              <span className="hide-mobile">Sign Out</span>
+              <span className="hide-desktop">✕</span>
             </button>
           </div>
         }
@@ -1093,13 +1100,13 @@ export default function SettingsPage() {
             }}>
               <ProviderHeader 
                 selectedProvider={selectedProvider}
-                currentProvider={currentProvider}
+                currentProvider={currentProvider || { enabled: false }}
                 onToggle={() => handleToggleProvider(selectedProvider)}
               />
 
               <ProviderContent
                 selectedProvider={selectedProvider}
-                currentProvider={currentProvider}
+                currentProvider={currentProvider || { enabled: false, config: { url: '', api_key: '' }, models: [] }}
                 showApiKey={!!showApiKey[selectedProvider]}
                 onConfigChange={handleConfigChange}
                 onToggleApiKey={() => setShowApiKey((p: any) => ({ ...p, [selectedProvider]: !p[selectedProvider] }))}

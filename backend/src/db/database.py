@@ -1,16 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(env_path)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://applymate:applymate123@localhost:5432/applymate"
+    "postgresql://applybuddy:applybuddy123@localhost:5432/applybuddy"
 )
 
 engine = create_engine(DATABASE_URL)

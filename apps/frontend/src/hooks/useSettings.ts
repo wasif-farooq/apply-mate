@@ -43,8 +43,8 @@ const DEFAULT_PROVIDERS: Record<string, ProviderState> = {
 const isDev = process.env.NODE_ENV === 'development'
 
 const DEFAULT_PROVIDER_NAMES = isDev
-  ? ['ollama', 'ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go', 'openai', 'anthropic', 'google']
-  : ['ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go', 'openai', 'anthropic', 'google']
+  ? ['ollama', 'ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go']
+  : ['ollama_cloud', 'openrouter', 'opencode_zen', 'opencode_go']
 
 export interface UseSettingsReturn {
   loading: boolean
@@ -77,7 +77,7 @@ export function useSettings(): UseSettingsReturn {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useState('ollama')
+  const [selectedProvider, setSelectedProvider] = useState(DEFAULT_PROVIDER_NAMES[0])
   const [globalSelectedModel, setGlobalSelectedModel] = useState<string | null>(null)
   const [globalSelectedProvider, setGlobalSelectedProvider] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
@@ -263,8 +263,10 @@ const newProviders: Record<string, ProviderState> = {}
     }
   }, [providers, saveProvider])
 
-  const activeProvider = Object.entries(providers).find(([_, p]) => p.enabled && p.models.some(m => m.selected))
-  const currentProvider = providers[selectedProvider]
+  const validProviders = Object.keys(providers)
+  const safeSelectedProvider = validProviders.includes(selectedProvider) ? selectedProvider : validProviders[0] || 'ollama'
+  const activeProvider = Object.entries(providers).find(([_, p]) => p?.enabled && p?.models?.some(m => m?.selected))
+  const currentProvider = providers[safeSelectedProvider] || { enabled: false, config: { url: '', api_key: '' }, models: [] }
 
   const setFetchingState = useCallback((provider: string, state: boolean) => {
     setFetchingStates(prev => ({ ...prev, [provider]: state }))

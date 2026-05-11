@@ -61,15 +61,19 @@ function TipTapEditor({ value, onChange }: { value: string; onChange: (content: 
 
   return (
     <div className="tiptap-editor-container">
-      <div className="tiptap-toolbar" style={{
+      <div className="tiptap-toolbar scroll-x" style={{
         display: 'flex',
         gap: '4px',
         padding: '8px',
         background: '#1c2d38',
         borderBottom: '1px solid #2a3f4f',
         borderRadius: '8px 8px 0 0',
-        flexWrap: 'wrap'
-      }}>
+        flexWrap: 'nowrap',
+        minWidth: '100%',
+      }}
+      role="toolbar"
+      aria-label="Formatting options"
+      >
         <ToolbarButton 
           editor={editor} 
           action={() => editor.chain().focus().toggleBold().run()} 
@@ -152,6 +156,8 @@ function ToolbarButton({ editor, action, isActive, label, style }: {
         borderRadius: '4px',
         cursor: 'pointer',
         fontWeight: 600,
+        flexShrink: 0,
+        minWidth: 'auto',
         ...style
       }}
     >
@@ -695,20 +701,22 @@ export default function ApplyPage() {
         logo="ApplyBuddy"
         showLogoIcon={true}
         rightElement={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {navItems.map(item => (
-              <Link 
-                key={item.href} 
-                href={item.href} 
-                style={{ 
-                  color: item.active ? '#00ed64' : '#a8b3bc', 
-                  textDecoration: 'none', 
-                  fontSize: '14px' 
-                }}
-              >
-                {item.label}
-              </Link>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {navItems.map(item => (
+                <Link 
+                  key={item.href} 
+                  href={item.href} 
+                  style={{ 
+                    color: item.active ? '#00ed64' : '#a8b3bc', 
+                    textDecoration: 'none', 
+                    fontSize: '14px' 
+                  }}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
             <button
               onClick={signOut}
               style={{
@@ -718,10 +726,13 @@ export default function ApplyPage() {
                 padding: '6px 12px',
                 borderRadius: '6px',
                 fontSize: '14px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                minWidth: 'auto',
+                minHeight: 'auto',
               }}
             >
-              Sign Out
+              <span className="hide-mobile">Sign Out</span>
+              <span className="hide-desktop">✕</span>
             </button>
           </div>
         }

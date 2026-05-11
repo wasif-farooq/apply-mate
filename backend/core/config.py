@@ -1,7 +1,8 @@
 import os
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -46,13 +47,27 @@ class Settings(BaseSettings):
     GMAIL_SENDER_NAME: str = os.getenv("GMAIL_SENDER_NAME", "Wasif Farooq")
     GMAIL_SCOPES: list[str] = ["https://www.googleapis.com/auth/gmail.send"]
 
-    # CORS
-    CORS_ORIGINS: list[str] = [
+# CORS
+    CORS_ORIGINS: List[str] = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-]
+    ]
+
+    @field_validator('CORS_ORIGINS', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if v is None or v == '':
+            return [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:8000",
+                "http://127.0.0.1:8000",
+            ]
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
+        return v
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "DEBUG").upper()

@@ -5,6 +5,93 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { LogoIcon } from '@applybuddy/ui'
 
+function MobileMenu({ user, onSignIn, onSignOut }: { 
+  user: any; 
+  onSignIn: () => void; 
+  onSignOut: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className="mobile-menu hide-desktop" style={{ position: 'relative' }}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: '#fff',
+          fontSize: '24px',
+          cursor: 'pointer',
+          padding: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: '44px',
+          minHeight: '44px',
+        }}
+        aria-label="Toggle menu"
+      >
+        {isOpen ? '✕' : '☰'}
+      </button>
+      
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          background: '#0d1f2b',
+          border: '1px solid #1c2d38',
+          borderRadius: '12px',
+          padding: '16px',
+          minWidth: '200px',
+          zIndex: 100,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        }}>
+          {user ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px', padding: '8px 0' }} onClick={() => setIsOpen(false)}>
+                Apply
+              </Link>
+              <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px', padding: '8px 0' }} onClick={() => setIsOpen(false)}>
+                History
+              </Link>
+              <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px', padding: '8px 0' }} onClick={() => setIsOpen(false)}>
+                Settings
+              </Link>
+              <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px', padding: '8px 0' }} onClick={() => setIsOpen(false)}>
+                Resumes
+              </Link>
+              <button 
+                onClick={() => { onSignOut(); setIsOpen(false); }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #ff6b6b',
+                  color: '#ff6b6b',
+                  padding: '10px 16px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  textAlign: 'left',
+                }}
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={onSignIn}
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+            >
+              Sign in with Google
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Home() {
   const { user, signIn, signOut, loading } = useAuth()
 
@@ -37,70 +124,79 @@ export default function Home() {
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center',
-          marginBottom: '40px'
+          marginBottom: '40px',
+          flexWrap: 'wrap',
+          gap: '16px'
         }}>
           <Link href="/" style={{ color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <LogoIcon style={{ width: '24px', height: '24px' }} />
             <span style={{ fontSize: '18px', fontWeight: 500 }}>ApplyBuddy</span>
           </Link>
           
-          {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
-                Apply
-              </Link>
-              <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
-                History
-              </Link>
-              <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
-                Settings
-              </Link>
-              <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
-                Resumes
-              </Link>
+          {/* Desktop Nav */}
+          <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {user ? (
+              <>
+                <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
+                  Apply
+                </Link>
+                <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
+                  History
+                </Link>
+                <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
+                  Settings
+                </Link>
+                <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>
+                  Resumes
+                </Link>
+                <button 
+                  onClick={signOut}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #ff6b6b',
+                    color: '#ff6b6b',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
               <button 
-                onClick={signOut}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #ff6b6b',
-                  color: '#ff6b6b',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
+                onClick={signIn}
+                className="btn btn-primary"
+                style={{ padding: '10px 20px', fontSize: '14px' }}
               >
-                Sign Out
+                Sign in with Google
               </button>
-            </div>
-          ) : (
-            <button 
-              onClick={signIn}
-              className="btn btn-primary"
-              style={{ padding: '10px 20px', fontSize: '14px' }}
-            >
-              Sign in with Google
-            </button>
-          )}
+            )}
+          </div>
+
+          {/* Mobile Menu */}
+          <MobileMenu user={user} onSignIn={signIn} onSignOut={signOut} />
         </div>
         
         {/* Hero Section */}
         <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-          <h1 style={{
-            fontSize: '56px',
+          <h1 className="hero-title" style={{
+            fontSize: 'var(--text-heading-1)',
             fontWeight: 500,
             marginBottom: '20px',
             letterSpacing: '-1px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '16px'
+            gap: '16px',
+            flexWrap: 'wrap'
           }}>
-            <LogoIcon style={{ width: '64px', height: '64px' }} />
-            ApplyBuddy
+            <LogoIcon style={{ width: '48px', height: '48px' }} />
+            <span>ApplyBuddy</span>
           </h1>
           <p style={{
-            fontSize: '20px',
+            fontSize: 'var(--text-subtitle)',
             color: '#a8b3bc',
             maxWidth: '500px',
             margin: '0 auto'
@@ -110,7 +206,7 @@ export default function Home() {
         </div>
 
         {/* CTA Buttons */}
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
           {user ? (
             <Link href="/apply">
               <button className="btn btn-primary" style={{
@@ -143,12 +239,7 @@ export default function Home() {
         </div>
 
         {/* Features */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '24px',
-          marginTop: '80px'
-        }}>
+        <div className="features-grid">
           <div className="card" style={{
             background: 'rgba(255,255,255,0.05)',
             border: '1px solid rgba(255,255,255,0.1)',
@@ -186,20 +277,14 @@ export default function Home() {
         {/* How It Works */}
         <div id="how-it-works" style={{ marginTop: '80px' }}>
           <h2 style={{
-            fontSize: '36px',
+            fontSize: 'var(--text-heading-2)',
             fontWeight: 500,
             textAlign: 'center',
             marginBottom: '40px'
           }}>
             How It Works
           </h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '20px',
-            maxWidth: '900px',
-            margin: '0 auto'
-          }}>
+          <div className="steps-grid" style={{ maxWidth: '900px', margin: '0 auto' }}>
             <div style={{ textAlign: 'center', padding: '16px' }}>
               <div style={{
                 width: '56px',
@@ -286,18 +371,14 @@ export default function Home() {
         {/* Use Cases */}
         <div style={{ marginTop: '80px' }}>
           <h2 style={{
-            fontSize: '36px',
+            fontSize: 'var(--text-heading-2)',
             fontWeight: 500,
             textAlign: 'center',
             marginBottom: '40px'
           }}>
             Who It's For
           </h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '20px'
-          }}>
+          <div className="grid-responsive">
             <div style={{
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.08)',
@@ -340,20 +421,14 @@ export default function Home() {
         {/* Benefits */}
         <div style={{ marginTop: '80px', marginBottom: '40px' }}>
           <h2 style={{
-            fontSize: '36px',
+            fontSize: 'var(--text-heading-2)',
             fontWeight: 500,
             textAlign: 'center',
             marginBottom: '40px'
           }}>
             Why ApplyBuddy
           </h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '20px',
-            maxWidth: '700px',
-            margin: '0 auto'
-          }}>
+          <div className="grid-responsive" style={{ maxWidth: '700px', margin: '0 auto', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '16px' }}>
               <div style={{
                 width: '40px',
@@ -446,7 +521,7 @@ export default function Home() {
             padding: '32px'
           }}>
             <h2 style={{
-              fontSize: '28px',
+              fontSize: 'var(--text-heading-4)',
               fontWeight: 500,
               textAlign: 'center',
               marginBottom: '8px'
@@ -461,11 +536,7 @@ export default function Home() {
             }}>
               We're building the future of automated job applications
             </p>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '24px'
-            }}>
+            <div className="grid-responsive">
               <div style={{
                 background: 'rgba(0,0,0,0.2)',
                 borderRadius: '12px',

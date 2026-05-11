@@ -336,3 +336,233 @@ h4 {
 .email-body ol:empty {
   display: none !important;
 }
+
+/* ============================================
+   RESPONSIVE BREAKPOINTS & UTILITIES
+   ============================================ */
+
+/* Breakpoints */
+@media (max-width: 639px) {
+  :root {
+    --text-hero-display: 40px;
+    --text-display-lg: 32px;
+    --text-heading-1: 32px;
+    --text-heading-2: 28px;
+    --text-heading-3: 24px;
+    --text-heading-4: 20px;
+    --text-heading-5: 16px;
+    --text-subtitle: 16px;
+    --text-body-md: 14px;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 767px) {
+  :root {
+    --text-hero-display: 48px;
+    --text-display-lg: 40px;
+    --text-heading-1: 36px;
+    --text-heading-2: 32px;
+    --text-heading-3: 26px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --text-hero-display: 56px;
+    --text-display-lg: 48px;
+    --text-heading-1: 40px;
+  }
+}
+
+/* Responsive container */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-xl);
+}
+
+@media (max-width: 639px) {
+  .container {
+    padding: 0 var(--spacing-md);
+  }
+}
+
+/* Responsive grid helper */
+.grid-responsive {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+@media (max-width: 639px) {
+  .grid-responsive {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+}
+
+/* Hide on mobile */
+@media (max-width: 639px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Hide on desktop */
+@media (min-width: 640px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Responsive flex utilities */
+.flex-col-mobile {
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .flex-col-mobile {
+    flex-direction: row;
+  }
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (max-width: 639px) {
+  .flex-between {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+}
+
+/* Responsive spacing */
+.p-responsive {
+  padding: var(--spacing-xl);
+}
+
+@media (max-width: 639px) {
+  .p-responsive {
+    padding: var(--spacing-md);
+  }
+}
+
+.mt-responsive {
+  margin-top: var(--spacing-xxl);
+}
+
+@media (max-width: 639px) {
+  .mt-responsive {
+    margin-top: var(--spacing-xl);
+  }
+}
+
+/* Mobile-first button improvements */
+.btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (max-width: 639px) {
+  .btn {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+}
+
+/* Responsive inputs */
+.input {
+  min-height: 44px;
+}
+
+@media (max-width: 639px) {
+  .input {
+    font-size: 16px;
+    padding: 12px var(--spacing-md);
+  }
+}
+
+/* Touch-friendly form elements */
+input, select, textarea, button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Card responsive */
+.card {
+  padding: var(--spacing-xl);
+}
+
+@media (max-width: 639px) {
+  .card {
+    padding: var(--spacing-md);
+  }
+}
+
+/* Scrollable container for horizontal overflow */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll-x::-webkit-scrollbar {
+  height: 6px;
+}
+
+.scroll-x::-webkit-scrollbar-track {
+  background: var(--color-surface-soft);
+  border-radius: 3px;
+}
+
+.scroll-x::-webkit-scrollbar-thumb {
+  background: var(--color-hairline-strong);
+  border-radius: 3px;
+}
+
+/* Features Grid - 3 columns */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 80px;
+}
+
+@media (max-width: 767px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Steps Grid - 4 columns (How It Works) */
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1023px) {
+  .steps-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -72,6 +72,176 @@ OLLAMA_MODEL=gemma4:e2b
 - API base URL: http://localhost:8000
 - Logs saved to `backend/logs/`
 
+## Production Deployment
+
+### Architecture
+
+| Component | Location |
+|-----------|-----------|
+| Backend | Railway (Python service) |
+| Database | Railway PostgreSQL |
+| Frontend | Cloudflare Pages |
+| API Domain | api.applybuddy.net → Railway |
+
+---
+
+### Railway Backend Deployment
+
+#### Prerequisites
+- Railway account (paid plan required)
+- Cloudflare account with applybuddy.net zone
+
+#### Step 1: Install Railway CLI
+```bash
+npm install -g @railway/cli
+railway login
+```
+
+#### Step 2: Create Railway Project
+```bash
+railway init --name applybuddy-backend
+# Select workspace: Wasif Farooq's Projects
+# Select environment: production
+railway link -p <project-id>
+```
+
+#### Step 3: Add Services
+```bash
+# Add PostgreSQL
+railway add --database postgres
+
+# Add Backend Service (Empty)
+railway add --service backend-api
+```
+
+#### Step 4: Configure Backend Service
+
+Set environment variables (get project-id, environment-id, service-id from Railway dashboard):
+
+```bash
+# Set environment variables
+railway set --variables "JWT_SECRET=<generate-32-char-random-string>"
+railway set --variables "CORS_ORIGINS=[\"https://applybuddy.net\"]"
+railway set --variables "FRONTEND_URL=https://applybuddy.net"
+
+# Get DATABASE_URL from PostgreSQL service
+railway variables --service Postgres
+# Copy DATABASE_URL and set it for backend-api
+railway set --variables "DATABASE_URL=<postgres-database-url>"
+```
+
+Add persistent volume for uploads:
+```bash
+railway volume create --name uploads --mount-path /app/uploads
+```
+
+#### Step 5: Configure Start Command
+```bash
+railway update --start-command "sh -c \"uvicorn main:app --host 0.0.0.0 --port $PORT\""
+```
+
+#### Step 6: Deploy Backend
+```bash
+cd backend
+railway up . --path-as-root --detach
+```
+
+#### Step 7: Generate Domain
+```bash
+railway domain
+# Result: https://backend-api-production-xxxx.up.railway.app
+```
+
+#### Step 8: Configure Cloudflare DNS
+
+In Cloudflare Dashboard for applybuddy.net:
+
+| Type | Name | Target | Proxy |
+|------|------|--------|-------|
+| CNAME | api | backend-api-production-xxxx.up.railway.app | Proxied |
+
+#### Step 9: Update Frontend Environment
+
+In Cloudflare Pages settings:
+```
+NEXT_PUBLIC_API_URL=https://api.applybuddy.net
+```
+
+#### Step 10: Verify Deployment
+```bash
+# Test Railway URL
+curl https://backend-api-production-xxxx.up.railway.app/health
+
+# Test custom domain (after DNS propagates)
+curl https://api.applybuddy.net/health
+```
+
+---
+
+### Environment Variables Reference
+
+| Variable | Backend | Frontend | Required |
+|----------|---------|----------|----------|
+| DATABASE_URL | ✅ (auto from Railway) | - | Yes |
+| JWT_SECRET | ✅ | - | Yes (generate 32+ chars) |
+| CORS_ORIGINS | ✅ (JSON array) | - | Yes |
+| FRONTEND_URL | ✅ | - | Yes |
+| NEXT_PUBLIC_API_URL | - | ✅ | Yes |
+| AI_PROVIDER | ✅ (user configures) | - | No |
+| OPENAI_API_KEY | ✅ (user configures) | - | No |
+| GOOGLE_CLIENT_ID | ✅ (user configures) | - | No |
+
+---
+
+### Chrome Extension Deployment
+
+1. Update `apps/extension/.env.production` with production values
+2. Build: `cd apps/extension && pnpm build`
+3. Upload `apps/extension/dist` to Chrome Web Store Developer Dashboard
+
+---
+
+### Troubleshooting
+
+#### Issue: `$PORT` not a valid integer
+**Cause**: Uvicorn expects an integer, not `$PORT` literal
+**Solution**: Use `sh -c "uvicorn main:app --host 0.0.0.0 --port $PORT"` to properly interpolate
+
+#### Issue: CORS_ORIGINS fails to parse
+**Cause**: Pydantic tries to parse List[str] as JSON
+**Solution**: Pass as JSON array: `CORS_ORIGINS=["https://applybuddy.net"]`
+
+#### Issue: DATABASE_URL not available
+**Cause**: DATABASE_URL not shared between services by default
+**Solution**: Get from PostgreSQL service variables, explicitly add to backend service
+
+#### Issue: Deployment fails with security vulnerabilities
+**Cause**: Uploading entire monorepo includes vulnerable packages from other services
+**Solution**: Use `--path-as-root` flag to upload only backend/ directory
+
+#### Issue: 502 Bad Gateway
+**Cause**: App not listening on Railway's assigned port
+**Solution**: Ensure start command uses `$PORT` variable, not hardcoded port
+
+#### Issue: "Application failed to respond"
+**Cause**: App crashed during startup (check logs with `railway logs`)
+**Solution**: Common causes - missing DATABASE_URL, invalid CORS_ORIGINS format, missing JWT_SECRET
+
+#### Issue: Trial expired
+**Cause**: Railway trial period ended
+**Solution**: Select a paid plan at railway.app/account
+
+---
+
+### Cost Estimate (Railway)
+
+| Component | Approximate Cost |
+|-----------|-----------------|
+| Python Service | $5-10/month |
+| PostgreSQL | $5/month |
+| Persistent Volume | $1/month |
+| **Total** | ~$11-16/month |
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

@@ -1,0 +1,7 @@
+name = "applybuddy-frontend"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "out"
+
+[vars]
+NEXT_PUBLIC_API_URL = "https://api.applybuddy.net"
+NEXT_PUBLIC_FRONTEND_URL = "https://applybuddy.net"

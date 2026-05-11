@@ -85,10 +85,10 @@ class ProviderRepository:
         self.db.refresh(model)
         return model
 
-    def update_models(self, user_id: int, provider: str, model_names: list[str]) -> list[ProviderModel]:
+    def update_models(self, user_id: int, provider: str, models: list[dict]) -> list[ProviderModel]:
+        model_names = [m["model_name"] for m in models if isinstance(m, dict) and "model_name" in m]
         existing = self.get_models(user_id, provider)
         existing_names = {m.model_name for m in existing}
-        request_names = set(model_names)
 
         for name in model_names:
             if name not in existing_names:
