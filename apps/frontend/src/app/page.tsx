@@ -575,10 +575,18 @@ export default function Home() {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            marginBottom: '8px'
+            marginBottom: '16px'
           }}>
             <LogoIcon style={{ width: '20px', height: '20px' }} />
             <span style={{ color: '#fff', fontSize: '16px', fontWeight: 500 }}>ApplyBuddy</span>
+          </div>
+          <div style={{ display: 'flex', gap: '24px', justifyContent: 'center', marginBottom: '8px' }}>
+            <Link href="/terms" style={{ color: '#6b7280', fontSize: '14px', textDecoration: 'none' }}>
+              Terms of Service
+            </Link>
+            <Link href="/privacy" style={{ color: '#6b7280', fontSize: '14px', textDecoration: 'none' }}>
+              Privacy Policy
+            </Link>
           </div>
           <p style={{ color: '#6b7280', fontSize: '14px' }}>
             © 2025 ApplyBuddy. All rights reserved.
