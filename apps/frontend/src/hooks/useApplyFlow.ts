@@ -190,11 +190,19 @@ export function useApplyFlow(): UseApplyFlowReturn {
     setError('')
 
     try {
+      let finalResumePath = resumePath
+      if (!finalResumePath && selectedResumeId) {
+        const selectedResume = resumes.find(r => r.id === selectedResumeId)
+        if (selectedResume) {
+          finalResumePath = selectedResume.file_path
+        }
+      }
+
       await sendEmail({
         to_email: generatedEmail.email,
         subject: generatedEmail.subject,
         body: generatedEmail.body,
-        resume_path: resumePath || undefined,
+        resume_path: finalResumePath || undefined,
         application_id: generatedEmail.application_id
       })
       setSent(true)
@@ -203,7 +211,7 @@ export function useApplyFlow(): UseApplyFlowReturn {
     } finally {
       setLoading(false)
     }
-  }, [generatedEmail, resumePath])
+  }, [generatedEmail, resumePath, selectedResumeId, resumes])
 
   const handleReset = useCallback(() => {
     setStep('url')
