@@ -1,12 +1,11 @@
 'use client'
 
 import { useRef, useEffect } from 'react'
-import Link from 'next/link'
-import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { useApplyFlow, cleanEmailHTML } from '@/hooks/useApplyFlow'
-import { useAuth } from '@/lib/auth'
 import { formatFileSize } from '@/lib/api'
 import { StepIndicator, JobDetailsCard, ProcessingState, Header } from '@applybuddy/ui'
+import { Navigation } from '@/components/Navigation'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 import DOMPurify from 'dompurify'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -637,8 +636,6 @@ function SuccessMessage({ onReset }: { onReset: () => void }) {
 }
 
 export default function ApplyPage() {
-  const { user, loading: authLoading } = useAuthGuard()
-  const { signOut } = useAuth()
   
   const {
     step,
@@ -673,70 +670,20 @@ export default function ApplyPage() {
   } = useApplyFlow()
 
   const navItems = [
-    { href: '/apply', label: 'Apply', active: true },
-    { href: '/history', label: 'History', active: false },
-    { href: '/settings', label: 'Settings', active: false },
-    { href: '/resumes', label: 'Resumes', active: false },
+    { href: '/apply', label: 'Apply' },
+    { href: '/history', label: 'History' },
+    { href: '/settings', label: 'Settings' },
+    { href: '/resumes', label: 'Resumes' },
   ]
 
-  if (authLoading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#001e2b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-        <p>Loading...</p>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#001e2b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-        <p>Please sign in to access this page.</p>
-      </div>
-    )
-  }
-
   return (
-    <div style={{ minHeight: '100vh', background: '#001e2b', color: '#ffffff' }}>
-      <Header 
-        logo="ApplyBuddy"
-        showLogoIcon={true}
-        rightElement={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {navItems.map(item => (
-                <Link 
-                  key={item.href} 
-                  href={item.href} 
-                  style={{ 
-                    color: item.active ? '#00ed64' : '#a8b3bc', 
-                    textDecoration: 'none', 
-                    fontSize: '14px' 
-                  }}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-            <button
-              onClick={signOut}
-              style={{
-                background: 'transparent',
-                border: '1px solid #ff6b6b',
-                color: '#ff6b6b',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                minWidth: 'auto',
-                minHeight: 'auto',
-              }}
-            >
-              <span className="hide-mobile">Sign Out</span>
-              <span className="hide-desktop">✕</span>
-            </button>
-          </div>
-        }
-      />
+    <ProtectedRoute>
+      <div style={{ minHeight: '100vh', background: '#001e2b', color: '#ffffff' }}>
+        <Header 
+          logo="ApplyBuddy"
+          showLogoIcon={true}
+          rightElement={<Navigation items={navItems} activeHref="/apply" />}
+        />
 
       <StepIndicator steps={steps} currentStep={step} />
 
@@ -785,6 +732,7 @@ export default function ApplyPage() {
           loading={loading}
         />
       )}
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

@@ -45,7 +45,7 @@ export interface UseApplyFlowReturn {
   steps: typeof STEPS
   linkedinUrl: string
   resumeFile: File | null
-  resumePath: string
+  uploadedResumeId: number | null
   loading: boolean
   uploading: boolean
   error: string
@@ -59,7 +59,6 @@ export interface UseApplyFlowReturn {
   fetchResumes: () => Promise<void>
   setLinkedinUrl: (url: string) => void
   setResumeFile: (file: File | null) => void
-  setResumePath: (path: string) => void
   setError: (error: string) => void
   setGeneratedEmail: (email: ApplyResponse | null) => void
   setSent: (sent: boolean) => void
@@ -67,7 +66,7 @@ export interface UseApplyFlowReturn {
   setBodyEditMode: (edit: boolean) => void
   setStep: (step: Step) => void
   handleUrlSubmit: () => void
-  handleResumeUpload: () => Promise<void>
+  handleResumeUpload: () => Promise<number | undefined>
   handleNext: () => Promise<void>
   handleSkipResume: () => void
   generateEmail: () => Promise<void>
@@ -83,7 +82,7 @@ export function useApplyFlow(): UseApplyFlowReturn {
   const [step, setStep] = useState<Step>('url')
   const [linkedinUrl, setLinkedinUrl] = useState('')
   const [resumeFile, setResumeFile] = useState<File | null>(null)
-  const [resumePath, setResumePath] = useState('')
+  const [uploadedResumeId, setUploadedResumeId] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -126,15 +125,16 @@ export function useApplyFlow(): UseApplyFlowReturn {
     setStep('resume')
   }, [linkedinUrl])
 
-  const handleResumeUpload = useCallback(async () => {
-    if (!resumeFile) return
+  const handleResumeUpload = useCallback(async (): Promise<number | undefined> => {
+    if (!resumeFile) return undefined
     
     setUploading(true)
     setError('')
     
     try {
       const data = await uploadResume(resumeFile)
-      setResumePath(data.path)
+      setUploadedResumeId(data.resume_id)
+      return data.resume_id
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload resume')
     } finally {
@@ -142,14 +142,16 @@ export function useApplyFlow(): UseApplyFlowReturn {
     }
   }, [resumeFile])
 
-  const generateEmail = useCallback(async (resumePathOverride?: string) => {
+  const generateEmail = useCallback(async (resumeIdOverride?: number | null) => {
     setLoading(true)
     setError('')
 
     try {
       const result = await applyToJob({
         linkedin_url: linkedinUrl,
-        resume_path: resumePathOverride || resumePath || undefined
+        // The server resolves the row and checks ownership. Previously the
+        // client sent a filesystem path, which the server read unchecked.
+        resume_id: resumeIdOverride ?? uploadedResumeId ?? undefined,
       })
       setGeneratedEmail(result)
       setStep('preview')
@@ -159,24 +161,20 @@ export function useApplyFlow(): UseApplyFlowReturn {
     } finally {
       setLoading(false)
     }
-  }, [linkedinUrl, resumePath])
+  }, [linkedinUrl, uploadedResumeId])
 
   const handleNext = useCallback(async () => {
-    if (resumeFile && !resumePath) {
-      await handleResumeUpload()
+    let resumeId = uploadedResumeId
+    if (resumeFile && !resumeId) {
+      resumeId = (await handleResumeUpload()) ?? null
     }
-    
-    let finalResumePath = resumePath
-    if (!finalResumePath && selectedResumeId) {
-      const selectedResume = resumes.find(r => r.id === selectedResumeId)
-      if (selectedResume) {
-        finalResumePath = selectedResume.file_path
-      }
+    if (!resumeId) {
+      resumeId = selectedResumeId
     }
-    
+
     setStep('processing')
-    generateEmail(finalResumePath)
-  }, [resumeFile, resumePath, selectedResumeId, resumes, handleResumeUpload, generateEmail])
+    generateEmail(resumeId)
+  }, [resumeFile, uploadedResumeId, selectedResumeId, handleResumeUpload, generateEmail])
 
   const handleSkipResume = useCallback(() => {
     setStep('processing')
@@ -190,19 +188,11 @@ export function useApplyFlow(): UseApplyFlowReturn {
     setError('')
 
     try {
-      let finalResumePath = resumePath
-      if (!finalResumePath && selectedResumeId) {
-        const selectedResume = resumes.find(r => r.id === selectedResumeId)
-        if (selectedResume) {
-          finalResumePath = selectedResume.file_path
-        }
-      }
-
       await sendEmail({
         to_email: generatedEmail.email,
         subject: generatedEmail.subject,
         body: generatedEmail.body,
-        resume_path: finalResumePath || undefined,
+        resume_id: generatedEmail.resume_id ?? uploadedResumeId ?? selectedResumeId ?? undefined,
         application_id: generatedEmail.application_id
       })
       setSent(true)
@@ -211,13 +201,13 @@ export function useApplyFlow(): UseApplyFlowReturn {
     } finally {
       setLoading(false)
     }
-  }, [generatedEmail, resumePath, selectedResumeId, resumes])
+  }, [generatedEmail, uploadedResumeId, selectedResumeId])
 
   const handleReset = useCallback(() => {
     setStep('url')
     setLinkedinUrl('')
     setResumeFile(null)
-    setResumePath('')
+    setUploadedResumeId(null)
     setGeneratedEmail(null)
     setSent(false)
     setError('')
@@ -254,7 +244,7 @@ export function useApplyFlow(): UseApplyFlowReturn {
     steps: STEPS,
     linkedinUrl,
     resumeFile,
-    resumePath,
+    uploadedResumeId,
     loading,
     uploading,
     error,
@@ -268,7 +258,6 @@ export function useApplyFlow(): UseApplyFlowReturn {
     fetchResumes,
     setLinkedinUrl,
     setResumeFile,
-    setResumePath,
     setError,
     setGeneratedEmail,
     setSent,

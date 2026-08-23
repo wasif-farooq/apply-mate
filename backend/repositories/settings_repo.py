@@ -29,19 +29,3 @@ class SettingsRepository:
         self.db.commit()
         self.db.refresh(settings)
         return settings
-
-    def get_selected_model(self, user_id: int) -> tuple[Optional[str], Optional[str]]:
-        settings = self.get_by_user_id(user_id)
-        if settings:
-            return settings.selected_provider, settings.selected_model
-        return None, None
-
-    def set_selected_model(self, user_id: int, provider: str, model: str) -> UserSettings:
-        return self.update(user_id, selected_provider=provider, selected_model=model)
-
-    def get_resume_path(self, user_id: int) -> Optional[str]:
-        settings = self.get_by_user_id(user_id)
-        return settings.resume_path if settings else None
-
-    def set_resume_path(self, user_id: int, path: str) -> UserSettings:
-        return self.update(user_id, resume_path=path)

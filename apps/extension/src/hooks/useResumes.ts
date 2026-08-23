@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Resume } from '../types'
+import { fetchResumes as apiFetchResumes } from '../services/api'
 import { useAuthStorage } from './useStorage'
 
 interface UseResumesReturn {
@@ -33,19 +34,13 @@ export function useResumes(
     }
 
     try {
-      const response = await fetch(`${backendUrl}/api/resumes`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch resumes')
-      }
-
-      const data = await response.json()
+      // One HTTP client for the extension: services/api.ts. This hook used to
+      // re-implement the same call with its own error text.
+      const data = await apiFetchResumes(backendUrl, token)
       setResumes(data)
 
       if (!selectedResumeId && data.length > 0) {
-        const defaultResume = data.find((r: Resume) => r.is_default)
+        const defaultResume = data.find((r) => r.is_default)
         setSelectedResumeId(defaultResume?.id || data[0].id)
       }
     } catch (err: any) {

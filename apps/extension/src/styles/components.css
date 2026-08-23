@@ -114,3 +114,86 @@
   font-size: var(--font-size-md);
   color: var(--color-text-secondary);
 }
+/* --- Added for capture / feed review / feature toggles --- */
+
+.ext-secondary-btn {
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: #a8b3bc;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ext-secondary-btn:hover:not(:disabled) {
+  border-color: #00ed64;
+  color: #00ed64;
+}
+
+.ext-secondary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ext-notice {
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: rgba(0, 237, 100, 0.08);
+  border: 1px solid rgba(0, 237, 100, 0.25);
+  border-radius: 8px;
+  color: #b8f5d4;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ext-link-btn {
+  background: none;
+  border: none;
+  color: #a8b3bc;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0 4px;
+}
+
+.ext-link-btn:hover {
+  color: #ff6b6b;
+}
+
+.ext-toggle-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.ext-toggle-row.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ext-toggle-row input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.ext-toggle-row strong {
+  display: block;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ext-toggle-row em {
+  display: block;
+  margin-top: 2px;
+  color: #a8b3bc;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}

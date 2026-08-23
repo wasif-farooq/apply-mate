@@ -5,9 +5,12 @@ export const DEFAULT_BACKEND_URL = 'http://localhost:8000'
 export const API_ENDPOINTS = {
   apply: '/api/apply',
   send: '/api/send',
-  settings: '/api/settings',
   uploadResume: '/api/upload-resume',
+  emailSettings: '/api/settings/email',
+  feedSaveScan: '/api/feed/save-scan',
+  feedScan: '/api/feed/scan',
+  feedJobs: '/api/feed/jobs',
+  feedBatchApply: '/api/feed/batch-apply',
   health: '/health',
-  authGoogle: '/auth/google',
-  authCallback: '/auth/callback',
+  extensionToken: '/auth/extension/token',
 } as const

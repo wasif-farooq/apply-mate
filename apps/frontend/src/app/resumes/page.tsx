@@ -1,10 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useState, useRef } from 'react'
-import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { Header } from '@applybuddy/ui'
-import { useAuth } from '@/lib/auth'
+import { Navigation } from '@/components/Navigation'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { getResumes, uploadResume, setDefaultResume, deleteResume, Resume } from '@/lib/api'
 
 function ResumeList({
@@ -130,13 +129,18 @@ function ResumeList({
 }
 
 export default function ResumesPage() {
-  useAuthGuard()
-  const { user, signOut } = useAuth()
   const [resumes, setResumes] = useState<Resume[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const navItems = [
+    { href: '/apply', label: 'Apply' },
+    { href: '/history', label: 'History' },
+    { href: '/settings', label: 'Settings' },
+    { href: '/resumes', label: 'Resumes' },
+  ]
 
   useEffect(() => {
     loadResumes()
@@ -176,6 +180,12 @@ export default function ResumesPage() {
   }
 
   const uploadSingleFile = async (file: File) => {
+    const MAX_SIZE = 10 * 1024 * 1024
+    if (file.size > MAX_SIZE) {
+      alert('File size exceeds 10MB limit')
+      return
+    }
+
     setUploading(true)
     try {
       await uploadResume(file)
@@ -209,38 +219,13 @@ export default function ResumesPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#001e2b', color: '#ffffff' }}>
-      <Header
-        logo="ApplyBuddy"
-        showLogoIcon={true}
-        rightElement={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>
-              <Link href="/history" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>History</Link>
-              <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
-              <Link href="/resumes" style={{ color: '#00ed64', textDecoration: 'none', fontSize: '14px' }}>Resumes</Link>
-            </div>
-            <button
-              onClick={signOut}
-              style={{
-                background: 'transparent',
-                border: '1px solid #ff6b6b',
-                color: '#ff6b6b',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                minWidth: 'auto',
-                minHeight: 'auto',
-              }}
-            >
-              <span className="hide-mobile">Sign Out</span>
-              <span className="hide-desktop">✕</span>
-            </button>
-          </div>
-        }
-      />
+    <ProtectedRoute>
+      <div style={{ minHeight: '100vh', background: '#001e2b', color: '#ffffff' }}>
+        <Header
+          logo="ApplyBuddy"
+          showLogoIcon={true}
+          rightElement={<Navigation items={navItems} activeHref="/resumes" />}
+        />
 
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 24px' }}>
         <div style={{ marginBottom: '32px' }}>
@@ -313,6 +298,7 @@ export default function ResumesPage() {
           />
         </div>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

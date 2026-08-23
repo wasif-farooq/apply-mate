@@ -1,15 +1,18 @@
-from app.deps import get_db, get_current_user, get_settings_dep
+from app.deps import get_current_user, get_db, get_settings_dep
 from app.exceptions import (
     AppException,
     AuthenticationError,
-    NotFoundError,
-    ValidationError,
-    ExternalServiceError,
-    ForbiddenError,
     ConflictError,
     EmailNotFoundError,
-    ProviderNotConfiguredError,
-    GmailNotConnectedError
+    ExternalServiceError,
+    ForbiddenError,
+    GmailNotConnectedError,
+    NotFoundError,
+    RateLimitedError,
+    ServiceUnavailableError,
+    UnprocessableEntityError,
+    UpstreamResponseError,
+    ValidationError,
 )
 
 __all__ = [
@@ -24,6 +27,9 @@ __all__ = [
     "ForbiddenError",
     "ConflictError",
     "EmailNotFoundError",
-    "ProviderNotConfiguredError",
-    "GmailNotConnectedError"
+    "GmailNotConnectedError",
+    "UnprocessableEntityError",
+    "RateLimitedError",
+    "UpstreamResponseError",
+    "ServiceUnavailableError",
 ]

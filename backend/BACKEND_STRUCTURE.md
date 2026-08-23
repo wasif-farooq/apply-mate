@@ -32,16 +32,33 @@ backend/
 │   ├── schemas.py            # Pydantic DTOs (request/response)
 │   └── domain.py             # Domain dataclasses
 │
+├── alembic/                   # Schema migrations (applied by entrypoint.sh)
+│   ├── env.py
+│   └── versions/
+│
+├── db/                        # SQLAlchemy models and session (was src/db/)
+│   ├── database.py
+│   └── models.py
+│
 ├── repositories/              # Data access layer (Repository Pattern)
 │   ├── __init__.py
 │   ├── user_repo.py          # User CRUD operations
 │   ├── settings_repo.py      # User settings CRUD
-│   └── provider_repo.py     # Provider configs and models
+│   ├── resume_repo.py        # Resumes, including the extracted text
+│   ├── application_repo.py   # Generated/sent applications
+│   └── feed_repo.py          # Extension feed scans and scored jobs
 │
 ├── services/                  # Business logic layer (Service Layer)
 │   ├── __init__.py
 │   ├── auth_service.py       # OAuth authentication
-│   ├── ai_service.py         # LLM operations (LLMService, ResumeParser, EmailGenerator)
+│   ├── agents/               # Typed AI pipeline (AutoGen, structured output)
+│   │   ├── pipeline.py       # job -> fit -> draft -> critic loop
+│   │   ├── agents.py         # agent factories, no tools
+│   │   ├── schemas.py        # the contract each step returns
+│   │   ├── prompts.py
+│   │   ├── structured.py     # validated object out of one agent turn
+│   │   └── retry.py
+│   ├── job_post_source.py    # extension text, else server-side scrape
 │   ├── email_service.py      # Gmail operations
 │   └── job_service.py        # Job application orchestration
 │
@@ -52,13 +69,7 @@ backend/
 │   ├── resume_handler.py     # PDF processing
 │   └── logger.py             # Logging configuration
 │
-└── src/                       # Legacy code (to be removed after migration)
-    ├── db/                    # Database models and connection
-    ├── agent/                 # LangGraph agent (unused)
-    ├── ai/                    # AI-related code (merged into services/ai_service.py)
-    ├── ai_generator.py       # Old email generator (deprecated)
-    ├── auth.py               # Old auth functions (deprecated)
-    └── gmail_sender.py       # Old Gmail sender (deprecated)
+└── tests/                     # pytest, run by the pre-commit hook
 ```
 
 ## Design Patterns Applied
@@ -67,7 +78,7 @@ backend/
 |---------|----------------|
 | **Repository** | `repositories/*.py` - Abstraction for DB operations |
 | **Service Layer** | `services/*.py` - Business logic isolation |
-| **Factory** | `services/ai_service.py` - LLM provider factory |
+| **Singleton** | `core/llm.py` - one model client pair, owned by the app lifespan |
 | **Dependency Injection** | `app/deps.py` - FastAPI Depends |
 | **DTO/Schema** | `models/schemas.py` - Request/Response validation |
 | **Custom Exceptions** | `app/exceptions.py` - Domain-specific exceptions |
@@ -78,7 +89,7 @@ backend/
 - [x] Phase 2: Repository layer
 - [x] Phase 3: Service layer
 - [x] Phase 4: Route handlers + main.py refactor
-- [ ] Phase 5: Cleanup legacy src/ directory
+- [x] Phase 5: Cleanup legacy src/ (deleted; src/db graduated to db/)
 
 ## Running the Server
 

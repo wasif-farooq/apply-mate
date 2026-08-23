@@ -1,3 +1,13 @@
-from src.db.models import User, UserSettings, ProviderConfig, ProviderModel, JobApplication
+from db.models import (
+    JobApplication,
+    User,
+    UserResume,
+    UserSettings,
+)
 
-__all__ = ["User", "UserSettings", "ProviderConfig", "ProviderModel", "JobApplication"]
+__all__ = [
+    "User",
+    "UserSettings",
+    "JobApplication",
+    "UserResume",
+]

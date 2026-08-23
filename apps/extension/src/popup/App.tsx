@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import LoginPage from './pages/LoginPage'
 import ApplyPage from './pages/ApplyPage'
 import PreviewPage from './pages/PreviewPage'
+import ReviewPage from './pages/ReviewPage'
 import SettingsPage from './pages/SettingsPage'
 import { useAuthStorage, useSettingsStorage, useAuth } from '../hooks'
 import { EmailData } from '../types'
 
-type Page = 'login' | 'apply' | 'preview' | 'settings'
+type Page = 'login' | 'apply' | 'preview' | 'review' | 'settings'
 
 export default function App() {
   const [page, setPage] = useState<Page>('login')
@@ -98,6 +99,17 @@ export default function App() {
           initialLinkedinUrl={linkedInUrl}
           initialResumeId={resumeId}
           onGenerated={handleGeneratedEmail}
+          onLogout={handleLogout}
+          onSettings={handleSettings}
+          onReview={() => setPage('review')}
+        />
+      )
+
+    case 'review':
+      return (
+        <ReviewPage
+          backendUrl={backendUrl}
+          onBack={() => setPage('apply')}
           onLogout={handleLogout}
           onSettings={handleSettings}
         />

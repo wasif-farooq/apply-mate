@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import { STORAGE_KEYS } from '../utils/constants'
+import { DEFAULT_BACKEND_URL, DEFAULT_FEATURES, STORAGE_KEYS } from '../utils/constants'
+import type { FeatureSettings } from '../utils/constants'
 
 type StorageValue = string | number | boolean | object | null
 
@@ -81,7 +82,7 @@ export function useSettingsStorage() {
 
   const getBackendUrl = useCallback(async (): Promise<string> => {
     const url = await get<string>(STORAGE_KEYS.BACKEND_URL)
-    return url || 'http://localhost:8000'
+    return url || DEFAULT_BACKEND_URL
   }, [get])
 
   const setBackendUrl = useCallback(async (url: string): Promise<void> => {
@@ -109,6 +110,18 @@ export function useSettingsStorage() {
     }
   }, [set])
 
+  const getFeatures = useCallback(async (): Promise<FeatureSettings> => {
+    const stored = await get<Partial<FeatureSettings>>(STORAGE_KEYS.FEATURES)
+    // Merge rather than replace: a stored object written by an older build is
+    // missing any newly added toggle, and a missing toggle must not read as
+    // "off" for something that defaults on.
+    return { ...DEFAULT_FEATURES, ...(stored || {}) }
+  }, [get])
+
+  const setFeatures = useCallback(async (features: FeatureSettings): Promise<void> => {
+    await set(STORAGE_KEYS.FEATURES, features)
+  }, [set])
+
   return {
     getBackendUrl,
     setBackendUrl,
@@ -116,5 +129,7 @@ export function useSettingsStorage() {
     setLinkedInUrl,
     getSelectedResumeId,
     setSelectedResume,
+    getFeatures,
+    setFeatures,
   }
 }

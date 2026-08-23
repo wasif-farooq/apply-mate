@@ -6,12 +6,11 @@ export interface User {
 }
 
 export interface ApplyRequest {
-  linkedin_url: string
-  resume_path?: string
+  linkedin_url?: string
+  /** Post text captured from the page; when set the backend does not scrape. */
+  job_post_text?: string
+  resume_id?: number
   to_email?: string
-  provider?: string
-  model?: string
-  api_key?: string
 }
 
 export interface ApplyResponse {
@@ -24,30 +23,16 @@ export interface ApplyResponse {
   body: string
   status: string
   total_experience_years?: string
+  application_id?: number
+  resume_id?: number
 }
 
 export interface SendRequest {
   to_email: string
   subject: string
   body: string
-  resume_path?: string
-}
-
-export interface Settings {
-  selected_provider?: string
-  selected_model?: string
-  resume_path?: string
-}
-
-export interface ProviderConfig {
-  provider: string
-  enabled: boolean
-  config: Record<string, string>
-}
-
-export interface ProviderModel {
-  provider: string
-  model_name: string
+  resume_id?: number
+  application_id?: number
 }
 
 export interface OAuthToken {

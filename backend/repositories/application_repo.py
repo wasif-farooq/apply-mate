@@ -1,38 +1,61 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func, case
 
-from src.db.models import JobApplication
+from db.models import JobApplication
 
 
 class ApplicationRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(
-        self,
-        user_id: int,
-        linkedin_url: str,
-        title: str = None,
-        company: str = None,
-        location: str = None,
-        description: str = None,
-        resume_path: str = None,
-        total_experience_years: str = None,
-        status: str = "generated"
-    ) -> JobApplication:
+    # Fields a caller may set on create or update. Anything not listed is
+    # managed by the repository (id, user_id, timestamps).
+    WRITABLE = (
+        "title",
+        "company",
+        "location",
+        "description",
+        "resume_path",
+        "total_experience_years",
+        "match_json",
+        "sent_to_email",
+        "subject",
+        "body",
+        "error_message",
+        "status",
+    )
+
+    def create(self, user_id: int, linkedin_url: str, **fields) -> JobApplication:
+        unknown = set(fields) - set(self.WRITABLE)
+        if unknown:
+            raise ValueError(f"Unknown JobApplication fields: {sorted(unknown)}")
+
+        fields.setdefault("status", "generated")
         application = JobApplication(
             user_id=user_id,
             linkedin_url=linkedin_url,
-            title=title,
-            company=company,
-            location=location,
-            description=description,
-            resume_path=resume_path,
-            total_experience_years=total_experience_years,
-            status=status
+            **fields,
         )
         self.db.add(application)
+        self.db.commit()
+        self.db.refresh(application)
+        return application
+
+    def update(self, application_id: int, **fields) -> Optional[JobApplication]:
+        unknown = set(fields) - set(self.WRITABLE)
+        if unknown:
+            raise ValueError(f"Unknown JobApplication fields: {sorted(unknown)}")
+
+        application = self.db.query(JobApplication).filter(
+            JobApplication.id == application_id
+        ).first()
+        if not application:
+            return None
+
+        for key, value in fields.items():
+            if value is not None:
+                setattr(application, key, value)
         self.db.commit()
         self.db.refresh(application)
         return application
@@ -71,25 +94,9 @@ class ApplicationRepository:
         self,
         application_id: int,
         status: str,
-        sent_to_email: str = None,
-        subject: str = None,
-        body: str = None,
-        error_message: str = None
+        **fields,
     ) -> Optional[JobApplication]:
-        application = self.db.query(JobApplication).filter(JobApplication.id == application_id).first()
-        if application:
-            application.status = status
-            if sent_to_email is not None:
-                application.sent_to_email = sent_to_email
-            if subject is not None:
-                application.subject = subject
-            if body is not None:
-                application.body = body
-            if error_message is not None:
-                application.error_message = error_message
-            self.db.commit()
-            self.db.refresh(application)
-        return application
+        return self.update(application_id, status=status, **fields)
 
     def delete(self, application_id: int, user_id: int) -> bool:
         application = self.db.query(JobApplication).filter(
@@ -103,14 +110,16 @@ class ApplicationRepository:
         return False
 
     def get_stats(self, user_id: int) -> dict:
-        total = self.count_by_user(user_id)
-        sent = self.count_by_user(user_id, status="sent")
-        generated = self.count_by_user(user_id, status="generated")
-        failed = self.count_by_user(user_id, status="failed")
+        result = self.db.query(
+            func.count(JobApplication.id).label('total'),
+            func.sum(case((JobApplication.status == 'sent', 1), else_=0)).label('sent'),
+            func.sum(case((JobApplication.status == 'generated', 1), else_=0)).label('generated'),
+            func.sum(case((JobApplication.status == 'failed', 1), else_=0)).label('failed')
+        ).filter(JobApplication.user_id == user_id).first()
         
         return {
-            "total": total,
-            "sent": sent,
-            "generated": generated,
-            "failed": failed
+            "total": result.total or 0,
+            "sent": result.sent or 0,
+            "generated": result.generated or 0,
+            "failed": result.failed or 0
         }

@@ -1,21 +1,38 @@
-requests
-beautifulsoup4
-google-auth
-google-auth-oauthlib
-google-api-python-client
-python-dotenv
-click
-langgraph
-langchain
-langchain-community
-langchain-openai
-langchain-anthropic
-langchain-google-genai
-langchain-core
-fastapi
-uvicorn
-python-multipart
-psycopg2-binary
-authlib
-pyjwt
-pypdf
+requests==2.32.3
+beautifulsoup4==4.12.3
+google-auth==2.36.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.154.0
+python-dotenv==1.0.1
+click==8.1.7
+fastapi==0.115.0
+uvicorn==0.32.0
+python-multipart==0.0.17
+psycopg2-binary==2.9.10
+authlib==1.3.2
+pyjwt==2.9.0
+pypdf==5.1.0
+slowapi==0.1.9
+aiofiles==24.1.0
+pydantic~=2.10.0
+pydantic-settings~=2.10.0
+sqlalchemy==2.0.36
+alembic==1.14.0
+cryptography==44.0.0
+python-json-logger==3.2.1
+
+# --- Tests ---
+pytest==8.3.4
+pytest-asyncio==0.24.0
+# --- Agent runtime (AutoGen) ---
+autogen-agentchat==0.7.5
+autogen-core==0.7.5
+autogen-ext[openai]==0.7.5
+# 3.x moves to httpx2. Verified working against autogen-ext 0.7.5 and the
+# DashScope compatible-mode endpoint; pinned so a future major does not
+# arrive unannounced.
+openai==3.3.1
+tiktoken==0.14.0
+
+# --- LinkedIn scraping ---
+playwright==1.52.0
