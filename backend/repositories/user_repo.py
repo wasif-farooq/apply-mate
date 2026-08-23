@@ -1,7 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
-from models import User, UserSettings, ProviderConfig, ProviderModel
-from core.constants import DEFAULT_PROVIDERS, PROVIDER_DEFAULTS
+from models import User, UserSettings
 
 
 class UserRepository:
@@ -28,21 +27,16 @@ class UserRepository:
         self.db.add(user)
         self.db.flush()
 
-        settings = UserSettings(user_id=user.id)
-        self.db.add(settings)
+        try:
+            settings = UserSettings(user_id=user.id)
+            self.db.add(settings)
 
-        for provider in DEFAULT_PROVIDERS:
-            config = ProviderConfig(
-                user_id=user.id,
-                provider=provider,
-                enabled=provider == "ollama",
-                config=PROVIDER_DEFAULTS.get(provider, {})
-            )
-            self.db.add(config)
-
-        self.db.commit()
-        self.db.refresh(user)
-        return user
+            self.db.commit()
+            self.db.refresh(user)
+            return user
+        except Exception:
+            self.db.rollback()
+            raise
 
     def update(self, user: User, **kwargs) -> User:
         for key, value in kwargs.items():

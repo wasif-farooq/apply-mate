@@ -27,11 +27,9 @@ services:
     environment:
       - DATABASE_URL=postgresql://applymate:applybuddy123@applybuddy-db:5432/applymate
       - JWT_SECRET=${JWT_SECRET}
-      - AI_PROVIDER=${AI_PROVIDER:-openai}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
+      - AI_MODEL=${AI_MODEL:-qwen3.5-flash}
       - GMAIL_EMAIL=${GMAIL_EMAIL}
       - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
       - FRONTEND_URL=${FRONTEND_URL}
