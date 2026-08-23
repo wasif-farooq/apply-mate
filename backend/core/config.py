@@ -36,19 +36,40 @@ class Settings(BaseSettings):
 
     # AI -- one server-side model for everyone. There is deliberately no
     # per-user provider/model/key: see PLANS or git history for the rip-out.
-    DASHSCOPE_API_KEY: str = os.getenv("DASHSCOPE_API_KEY", "")
-    DASHSCOPE_BASE_URL: str = os.getenv(
-        "DASHSCOPE_BASE_URL",
-        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-    )
-    AI_MODEL: str = os.getenv("AI_MODEL", "qwen3.5-flash")
+    #
+    # Any OpenAI-compatible endpoint works; only these three values change.
+    # Currently OpenCode Zen, on a free-tier model -- the "-free" suffix is how
+    # they mark those. https://opencode.ai/zen/v1/models lists the ids and
+    # needs no auth to read.
+    #
+    # laguna-s-2.1-free was measured end to end against the real pipeline at
+    # ~44s, the fastest of the free models that return valid JSON for all five
+    # steps. Measured alternatives: nemotron-3-ultra-free ~102s,
+    # mimo-v2.5-free ~217s, x-preview-f-free ~373s. Avoid
+    # nemotron-3.5-lightning-free -- it emits its reasoning instead of JSON and
+    # fails even after the repair turn. deepseek-v4-flash-free is listed but
+    # the gateway answers "Model is unavailable"; minimax needs paid credit.
+    #
+    # For Alibaba DashScope instead:
+    #   AI_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+    AI_API_KEY: str = os.getenv("AI_API_KEY", "")
+    AI_BASE_URL: str = os.getenv("AI_BASE_URL", "https://opencode.ai/zen/v1")
+    AI_MODEL: str = os.getenv("AI_MODEL", "laguna-s-2.1-free")
 
-    # "json_object": the model is asked for a JSON object and we validate it
-    #   ourselves. This is the portable path and works on the flash tiers.
-    # "json_schema": AutoGen sends a strict JSON Schema via response_format and
-    #   hands back an already-validated model. Only the plus/max tiers support
-    #   it -- flip AI_MODEL at the same time or DashScope will 400.
-    AI_STRUCTURED_MODE: str = os.getenv("AI_STRUCTURED_MODE", "json_object")
+    # How the model is asked for structured output, in order of how much it
+    # demands of the provider:
+    #
+    # "prompt"      Nothing is sent but the prompt, which carries the JSON
+    #               schema; we parse and validate the reply ourselves, with one
+    #               repair turn. Works against any endpoint, which is why it is
+    #               the default -- a provider that rejects an unknown parameter
+    #               fails the whole request.
+    # "json_object" Adds response_format={"type":"json_object"}. Slightly more
+    #               reliable where supported.
+    # "json_schema" AutoGen sends a strict JSON Schema and hands back an
+    #               already-validated object. Few models support it; check
+    #               before switching or expect a 400.
+    AI_STRUCTURED_MODE: str = os.getenv("AI_STRUCTURED_MODE", "prompt")
 
     AI_TEMPERATURE_ANALYSIS: float = float(os.getenv("AI_TEMPERATURE_ANALYSIS", "0.1"))
     AI_TEMPERATURE_WRITING: float = float(os.getenv("AI_TEMPERATURE_WRITING", "0.7"))
@@ -90,18 +111,18 @@ class Settings(BaseSettings):
     @field_validator('AI_STRUCTURED_MODE')
     @classmethod
     def validate_structured_mode(cls, v):
-        allowed = {"json_object", "json_schema"}
+        allowed = {"prompt", "json_object", "json_schema"}
         if v not in allowed:
             raise ValueError(f"AI_STRUCTURED_MODE must be one of {sorted(allowed)}, got {v!r}")
         return v
 
-    @field_validator('DASHSCOPE_API_KEY')
+    @field_validator('AI_API_KEY')
     @classmethod
-    def validate_dashscope_key(cls, v):
+    def validate_ai_key(cls, v):
         if not v:
             raise ValueError(
-                "DASHSCOPE_API_KEY environment variable is required. "
-                "Create one in the Alibaba Cloud Model Studio console."
+                "AI_API_KEY environment variable is required. "
+                "Get one from your AI provider (currently OpenCode Zen)."
             )
         return v
 

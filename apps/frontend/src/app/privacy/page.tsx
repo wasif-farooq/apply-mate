@@ -134,7 +134,7 @@ export default function Privacy() {
               We share your information with third parties only in the following circumstances:
             </p>
             <ul style={{ marginTop: '12px', paddingLeft: '24px' }}>
-              <li style={{ marginBottom: '8px' }}><strong style={{ color: '#fff' }}>AI Provider:</strong> Job posting content and the text of your uploaded resume are sent to Alibaba Cloud Model Studio (DashScope) to generate personalized email content. This data is processed in accordance with Alibaba Cloud&apos;s privacy policy.</li>
+              <li style={{ marginBottom: '8px' }}><strong style={{ color: '#fff' }}>AI Provider:</strong> Job posting content and the text of your uploaded resume are sent to our AI provider, OpenCode Zen, to generate personalized email content. This data is processed in accordance with that provider&apos;s privacy policy.</li>
               <li style={{ marginBottom: '8px' }}><strong style={{ color: '#fff' }}>Google:</strong> As described above, for authentication and email sending.</li>
               <li style={{ marginBottom: '8px' }}><strong style={{ color: '#fff' }}>Legal Requirements:</strong> If required by law, such as in response to a subpoena or court order.</li>
             </ul>
