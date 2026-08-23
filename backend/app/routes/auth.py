@@ -13,6 +13,7 @@ from models import User
 from models.schemas import UserWithToken
 from repositories.user_repo import UserRepository
 from services.auth_service import AuthService
+from core.limiter import limiter
 
 logger = logging.getLogger("job-applier")
 
@@ -21,7 +22,8 @@ settings = get_settings()
 
 
 @router.get("/login")
-def auth_login(db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def auth_login(request: Request, db: Session = Depends(get_db)):
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         logger.error("[Auth] Google OAuth not configured")
         raise HTTPException(status_code=500, detail="Google OAuth not configured")
@@ -34,7 +36,7 @@ def auth_login(db: Session = Depends(get_db)):
         return {"authorization_url": auth_url, "state": state}
     except Exception as e:
         logger.error(f"[Auth] Login failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Authentication service unavailable")
 
 
 class AuthCallbackRequest(BaseModel):
@@ -43,12 +45,13 @@ class AuthCallbackRequest(BaseModel):
 
 
 @router.post("/callback")
-def auth_callback(request: AuthCallbackRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def auth_callback(request: Request, callback_request: AuthCallbackRequest, db: Session = Depends(get_db)):
     user_repo = UserRepository(db)
     auth_service = AuthService(user_repo)
 
     try:
-        user = auth_service.authenticate_google(request.code, request.state)
+        user = auth_service.authenticate_google(callback_request.code, callback_request.state)
         token = create_access_token(user.id)
 
         logger.info(f"[Auth] User logged in: {user.email}")
@@ -61,7 +64,7 @@ def auth_callback(request: AuthCallbackRequest, db: Session = Depends(get_db)):
         )
     except Exception as e:
         logger.error(f"[Auth] Callback failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
 
 
 @router.post("/logout")
@@ -80,6 +83,7 @@ def auth_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/refresh")
+@limiter.limit("10/minute")
 def auth_refresh(request: Request, db: Session = Depends(get_db)):
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
