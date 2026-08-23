@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { FeatureSettings } from '../components'
 import { useAuthStorage, useSettingsStorage } from '../../hooks'
 import '../../styles/theme.css'
 import '../../styles/components.css'
@@ -65,6 +66,8 @@ export default function SettingsPage({ backendUrl, onBackendUrlChange, onLogout,
       </div>
 
       <div className="settings-content">
+        <FeatureSettings />
+
         <div className="settings-section">
           <h2 className="settings-title">Account</h2>
           {userEmail ? (

@@ -39,6 +39,10 @@ export default function PreviewPage({ backendUrl, emailData, onBack, onSent }: P
         to_email: toEmail,
         subject: subject,
         body: body,
+        // Carried through from /api/apply so the PDF gets attached and the
+        // application row is marked sent rather than left as generated.
+        resume_id: emailData.resume_id,
+        application_id: emailData.application_id,
       })
 
       setSent(true)

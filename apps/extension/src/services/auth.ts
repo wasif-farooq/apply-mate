@@ -1,4 +1,3 @@
-import { useAuthStorage } from '../hooks/useStorage'
 
 interface GoogleUserInfo {
   email: string
@@ -51,18 +50,6 @@ export async function createBackendSession(
   }
 
   return response.json()
-}
-
-export async function loginWithGoogle(
-  backendUrl: string,
-  { setToken, setUserEmail }: ReturnType<typeof useAuthStorage>
-): Promise<void> {
-  const googleToken = await getGoogleAuthToken()
-  const userInfo = await getGoogleUserInfo(googleToken)
-  const sessionData = await createBackendSession(backendUrl, googleToken)
-
-  await setToken(sessionData.access_token)
-  await setUserEmail(userInfo.email)
 }
 
 export async function logout(clearAuth: () => Promise<void>): Promise<void> {

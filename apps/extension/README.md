@@ -71,12 +71,14 @@ The extension requires a running ApplyBuddy backend. By default, it connects to:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/auth/google` | GET | Initiate Google OAuth |
-| `/auth/callback` | GET | OAuth callback |
-| `/api/settings` | GET | Get user settings |
-| `/api/apply` | POST | Generate email |
-| `/api/upload-resume` | POST | Upload resume |
-| `/api/send` | POST | Send email |
+| `/auth/extension/token` | POST | Exchange a Google token for a session JWT |
+| `/api/resumes` | GET | List the user's resumes |
+| `/api/apply` | POST | Generate an email from captured post text |
+| `/api/send` | POST | Send the email |
+| `/api/feed/save-scan` | POST | Persist everything a feed scan saw |
+| `/api/feed/scan` | POST | Score captured jobs against the resume |
+| `/api/feed/jobs` | GET | The scored review queue |
+| `/api/feed/batch-apply` | POST | Generate applications for selected jobs |
 
 ## Configuration
 
