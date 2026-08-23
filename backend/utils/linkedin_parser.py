@@ -1,24 +1,150 @@
+import atexit
+import time
 import requests
 from bs4 import BeautifulSoup
 import re
+from functools import lru_cache
 from utils.logger import logger
 
 
-def fetch_linkedin_post(url: str) -> dict:
+class PlaywrightScraper:
+    _playwright = None
+    _browser = None
+
+    @classmethod
+    def _ensure_browser(cls):
+        if cls._browser is not None and cls._browser.is_connected():
+            return cls._browser
+        from playwright.sync_api import sync_playwright
+        cls._playwright = sync_playwright().start()
+        cls._browser = cls._playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+            ],
+        )
+        return cls._browser
+
+    @classmethod
+    def get_page_html(cls, url: str, timeout: int = 30000) -> str:
+        browser = cls._ensure_browser()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 720},
+            locale="en-US",
+        )
+        page = context.new_page()
+        try:
+            page.goto(url, wait_until="networkidle", timeout=timeout)
+            page.wait_for_load_state("domcontentloaded")
+            html = page.content()
+            return html
+        finally:
+            page.close()
+            context.close()
+
+    @classmethod
+    def cleanup(cls):
+        if cls._browser:
+            try:
+                cls._browser.close()
+            except Exception:
+                pass
+            cls._browser = None
+        if cls._playwright:
+            try:
+                cls._playwright.stop()
+            except Exception:
+                pass
+            cls._playwright = None
+
+
+atexit.register(PlaywrightScraper.cleanup)
+
+
+@lru_cache(maxsize=256)
+def fetch_linkedin_post_cached(url: str, ttl_hash: int) -> dict:
+    return _fetch_linkedin_post(url)
+
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+]
+
+
+def _fetch_with_retry(url: str) -> requests.Response:
+    max_retries = 3
+    base_delay = 2.0
+
+    for attempt in range(max_retries):
+        headers = {
+            "User-Agent": USER_AGENTS[attempt % len(USER_AGENTS)],
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        }
+        logger.debug(f"[LinkedIn] Request attempt {attempt + 1}/{max_retries}, User-Agent: {USER_AGENTS[attempt % len(USER_AGENTS)][:40]}...")
+        response = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
+        logger.debug(f"[LinkedIn] Response status: {response.status_code} | Content length: {len(response.text)} chars")
+
+        if response.ok:
+            return response
+
+        if response.status_code == 429:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(f"[LinkedIn] Rate limited (429). Retrying in {delay}s (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(delay)
+                continue
+            logger.error(f"[LinkedIn] Rate limited after {max_retries} attempts.")
+            response.raise_for_status()
+
+        if 500 <= response.status_code < 600:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(f"[LinkedIn] Server error {response.status_code}. Retrying in {delay}s (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(delay)
+                continue
+            response.raise_for_status()
+
+        response.raise_for_status()
+
+    return response
+
+
+LOGIN_INDICATORS = ["sign in", "join now", "sign up", "linkedin.com/login"]
+
+
+def _is_login_page(html: str) -> bool:
+    text = html.lower()[:2000]
+    return any(indicator in text for indicator in LOGIN_INDICATORS)
+
+
+def _get_linkedin_html(url: str) -> str:
+    try:
+        html = PlaywrightScraper.get_page_html(url)
+        if html and len(html) > 500 and not _is_login_page(html):
+            logger.debug(f"[LinkedIn] Playwright fetched {len(html)} chars")
+            return html
+        if html and _is_login_page(html):
+            logger.warning("[LinkedIn] Playwright hit login wall, falling back to requests")
+    except Exception as e:
+        logger.warning(f"[LinkedIn] Playwright failed: {e}. Falling back to requests")
+
+    response = _fetch_with_retry(url)
+    return response.text
+
+
+def _fetch_linkedin_post(url: str) -> dict:
     logger.debug(f"[LinkedIn] Fetching URL: {url}")
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    }
+    html = _get_linkedin_html(url)
 
-    logger.debug(f"[LinkedIn] Request headers: User-Agent set")
-    response = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
-    logger.debug(f"[LinkedIn] Response status: {response.status_code} | Content length: {len(response.text)} chars")
-    response.raise_for_status()
-
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
 
     # Remove ALL comment-related containers to prevent email extraction from comments
     comment_selectors = [
@@ -51,7 +177,6 @@ def fetch_linkedin_post(url: str) -> dict:
         "company": "",
         "location": "",
         "description": "",
-        "raw_html": response.text,
     }
 
     # Try to find job-specific elements first (jobs board)
@@ -208,3 +333,14 @@ def fetch_linkedin_post(url: str) -> dict:
     logger.debug(f"[LinkedIn] Parsed data - Title: '{post_data['title']}', Company: '{post_data['company']}', Location: '{post_data['location']}', Description: '{post_data['description'][:100]}...'")
 
     return post_data
+
+
+CACHE_TTL_SECONDS = 300
+
+
+def fetch_linkedin_post(url: str) -> dict:
+    # The ttl_hash must be a function of time, not of the url -- it is what makes
+    # the lru_cache entry go stale. Every url in the same 5-minute window shares a
+    # bucket, so a repeat fetch hits the cache and a later one misses.
+    ttl_hash = int(time.time()) // CACHE_TTL_SECONDS
+    return fetch_linkedin_post_cached(url, ttl_hash)
