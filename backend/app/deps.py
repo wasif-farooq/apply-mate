@@ -1,11 +1,17 @@
-from typing import Generator, Optional
-from fastapi import Depends, Request, HTTPException
+from typing import Generator
+
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from core.config import get_settings, Settings
-from core.security import decode_token, verify_token
+from core.config import Settings, get_settings
+from core.security import decode_token
+from db.database import get_db as _get_db
 from models import User
-from src.db.database import get_db as _get_db
+from repositories.application_repo import ApplicationRepository
+from repositories.resume_repo import ResumeRepository
+from repositories.settings_repo import SettingsRepository
+from repositories.user_repo import UserRepository
+from services.job_service import JobService
 
 settings = get_settings()
 
@@ -18,9 +24,39 @@ def get_settings_dep() -> Settings:
     return settings
 
 
+def get_user_repo(db: Session = Depends(get_db)) -> UserRepository:
+    return UserRepository(db)
+
+
+def get_settings_repo(db: Session = Depends(get_db)) -> SettingsRepository:
+    return SettingsRepository(db)
+
+
+def get_application_repo(db: Session = Depends(get_db)) -> ApplicationRepository:
+    return ApplicationRepository(db)
+
+
+def get_resume_repo(db: Session = Depends(get_db)) -> ResumeRepository:
+    return ResumeRepository(db)
+
+
+def get_job_service(
+    user_repo: UserRepository = Depends(get_user_repo),
+    settings_repo: SettingsRepository = Depends(get_settings_repo),
+    application_repo: ApplicationRepository = Depends(get_application_repo),
+    resume_repo: ResumeRepository = Depends(get_resume_repo),
+) -> JobService:
+    return JobService(
+        user_repo=user_repo,
+        settings_repo=settings_repo,
+        application_repo=application_repo,
+        resume_repo=resume_repo,
+    )
+
+
 async def get_current_user(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> User:
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if not token:

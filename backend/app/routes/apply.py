@@ -1,19 +1,24 @@
 import logging
 import os
+import uuid
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
-from pydantic import BaseModel
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy.orm import Session
 
-from app.deps import get_db, get_current_user
+from app.deps import get_current_user, get_db, get_job_service
+from app.exceptions import NotFoundError, UnprocessableEntityError
+from core.limiter import limiter
+from core.llm import get_model_clients
 from models import User
-from repositories.user_repo import UserRepository
-from repositories.settings_repo import SettingsRepository
-from repositories.provider_repo import ProviderRepository
-from repositories.application_repo import ApplicationRepository
 from repositories.resume_repo import ResumeRepository
+from core.errors import ResumeTextUnavailable
 from services.job_service import JobService
+from utils.resume_handler import extract_text_from_pdf
 
 logger = logging.getLogger("job-applier")
 
@@ -22,15 +27,40 @@ router = APIRouter(prefix="/api", tags=["apply"])
 UPLOAD_DIR = Path(__file__).parent.parent.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
 
 class ApplyRequest(BaseModel):
-    linkedin_url: str
-    resume_path: str = "./resume.pdf"
-    to_email: str = None
-    provider: str = None
-    model: str = None
-    api_key: str = None
-    application_id: int = None
+    # Either supply the post text (the extension reads it from the logged-in
+    # DOM) or a URL for the server to scrape. Text wins when both are present.
+    linkedin_url: Optional[str] = None
+    job_post_text: Optional[str] = None
+    resume_id: Optional[int] = None
+    to_email: Optional[str] = None
+
+    @field_validator("linkedin_url")
+    @classmethod
+    def validate_linkedin_url(cls, v):
+        if v is None:
+            return v
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("LinkedIn URL must start with http:// or https://")
+        if "linkedin.com" not in v.lower():
+            raise ValueError("Invalid LinkedIn URL")
+        return v
+
+    @field_validator("to_email")
+    @classmethod
+    def validate_email(cls, v):
+        if v and "@" not in v:
+            raise ValueError("Invalid email address")
+        return v
+
+    @model_validator(mode="after")
+    def require_a_source(self):
+        if not self.linkedin_url and not (self.job_post_text or "").strip():
+            raise ValueError("Provide either linkedin_url or job_post_text")
+        return self
 
 
 class ApplyResponse(BaseModel):
@@ -42,61 +72,17 @@ class ApplyResponse(BaseModel):
     subject: str
     body: str
     status: str
-    total_experience_years: str = None
-    application_id: int = None
+    total_experience_years: Optional[str] = None
+    application_id: Optional[int] = None
+    resume_id: Optional[int] = None
 
 
 class SendRequest(BaseModel):
     to_email: str
     subject: str
     body: str
-    resume_path: str = "./resume.pdf"
-    application_id: int = None
-
-
-@router.post("/upload-resume")
-async def upload_resume(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    logger.info(f"[API] Uploading resume: {file.filename}")
-
-    try:
-        if not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        stored_filename = f"resume_{current_user.id}_{timestamp}.pdf"
-        filepath = UPLOAD_DIR / stored_filename
-
-        with open(filepath, "wb") as f:
-            content = await file.read()
-            f.write(content)
-
-        resume_repo = ResumeRepository(db)
-        
-        existing_resumes = resume_repo.get_by_user(current_user.id)
-        is_default = len(existing_resumes) == 0
-        
-        resume = resume_repo.create(
-            user_id=current_user.id,
-            filename=file.filename,
-            file_path=str(filepath),
-            is_default=is_default
-        )
-
-        logger.info(f"[API] Resume saved: {filepath}")
-        return {
-            "status": "uploaded",
-            "path": str(filepath),
-            "filename": file.filename,
-            "resume_id": resume.id
-        }
-
-    except Exception as e:
-        logger.error(f"[API] Resume upload failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    resume_id: Optional[int] = None
+    application_id: Optional[int] = None
 
 
 class ResumeResponse(BaseModel):
@@ -105,105 +91,119 @@ class ResumeResponse(BaseModel):
     file_path: str
     is_default: bool
     created_at: datetime
-    file_size: int = 0
+    file_size: Optional[int] = None
+    char_count: Optional[int] = None
+
+
+@router.post("/upload-resume")
+async def upload_resume(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    logger.info(f"[API] Uploading resume: {file.filename}")
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
+
+    # A uuid suffix, not just a timestamp: two uploads in the same second by
+    # the same user used to overwrite each other.
+    stored_filename = (
+        f"resume_{current_user.id}_"
+        f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.pdf"
+    )
+    filepath = UPLOAD_DIR / stored_filename
+
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    # Extract now, once. Everything downstream reads the stored text, so a PDF
+    # we cannot read is rejected here rather than silently producing a
+    # resume-less application later.
+    try:
+        resume_text = await run_in_threadpool(extract_text_from_pdf, str(filepath))
+    except ResumeTextUnavailable as exc:
+        filepath.unlink(missing_ok=True)
+        raise UnprocessableEntityError(str(exc)) from exc
+
+    resume_repo = ResumeRepository(db)
+    is_default = len(resume_repo.get_by_user(current_user.id)) == 0
+
+    resume = resume_repo.create(
+        user_id=current_user.id,
+        filename=file.filename,
+        file_path=str(filepath),
+        resume_text=resume_text,
+        is_default=is_default,
+    )
+
+    logger.info(
+        "[API] Resume %s stored, %d chars extracted", resume.id, len(resume_text)
+    )
+
+    return {
+        "status": "success",
+        "path": str(filepath),
+        "filename": file.filename,
+        "resume_id": resume.id,
+        "char_count": len(resume_text),
+    }
 
 
 @router.get("/resumes", response_model=list[ResumeResponse])
 def get_resumes(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    logger.info(f"[API] Getting resumes for user: {current_user.id}")
-    
     resume_repo = ResumeRepository(db)
-    resumes = resume_repo.get_by_user(current_user.id)
-    
+    resumes = resume_repo.get_by_user(current_user.id, limit=limit, offset=(page - 1) * limit)
+
     result = []
     for r in resumes:
         file_size = 0
-        if os.path.exists(r.file_path):
+        if r.file_path and os.path.exists(r.file_path):
             try:
                 file_size = os.path.getsize(r.file_path)
-            except Exception:
+            except OSError:
                 file_size = 0
-        result.append(ResumeResponse(
-            id=r.id,
-            filename=r.filename,
-            file_path=r.file_path,
-            is_default=r.is_default,
-            created_at=r.created_at,
-            file_size=file_size
-        ))
+        result.append(
+            ResumeResponse(
+                id=r.id,
+                filename=r.filename,
+                file_path=r.file_path,
+                is_default=r.is_default,
+                created_at=r.created_at,
+                file_size=file_size,
+                char_count=r.char_count,
+            )
+        )
     return result
-
-
-@router.post("/resumes", response_model=ResumeResponse)
-async def upload_resume_new(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    logger.info(f"[API] Uploading new resume: {file.filename}")
-
-    try:
-        if not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        stored_filename = f"resume_{current_user.id}_{timestamp}.pdf"
-        filepath = UPLOAD_DIR / stored_filename
-
-        with open(filepath, "wb") as f:
-            content = await file.read()
-            f.write(content)
-
-        resume_repo = ResumeRepository(db)
-        
-        existing_resumes = resume_repo.get_by_user(current_user.id)
-        is_default = len(existing_resumes) == 0
-        
-        resume = resume_repo.create(
-            user_id=current_user.id,
-            filename=file.filename,
-            file_path=str(filepath),
-            is_default=is_default
-        )
-
-        logger.info(f"[API] Resume created: {resume.id}")
-        
-        return ResumeResponse(
-            id=resume.id,
-            filename=resume.filename,
-            file_path=resume.file_path,
-            is_default=resume.is_default,
-            created_at=resume.created_at
-        )
-
-    except Exception as e:
-        logger.error(f"[API] Resume upload failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/resumes/{resume_id}/set-default", response_model=ResumeResponse)
 def set_default_resume(
     resume_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    logger.info(f"[API] Setting default resume: {resume_id}")
-
     resume_repo = ResumeRepository(db)
     resume = resume_repo.set_default(resume_id, current_user.id)
-
     if not resume:
-        raise HTTPException(status_code=404, detail="Resume not found")
+        raise NotFoundError("Resume not found")
 
     return ResumeResponse(
         id=resume.id,
         filename=resume.filename,
         file_path=resume.file_path,
         is_default=resume.is_default,
-        created_at=resume.created_at
+        created_at=resume.created_at,
+        char_count=resume.char_count,
     )
 
 
@@ -211,114 +211,80 @@ def set_default_resume(
 def delete_resume(
     resume_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    logger.info(f"[API] Deleting resume: {resume_id}")
-
     resume_repo = ResumeRepository(db)
-    success = resume_repo.delete(resume_id, current_user.id)
-
-    if not success:
-        raise HTTPException(status_code=404, detail="Resume not found")
-
-    return {"status": "deleted"}
+    if not resume_repo.delete(resume_id, current_user.id):
+        raise NotFoundError("Resume not found")
+    return {"status": "deleted", "resume_id": resume_id}
 
 
 @router.post("/apply", response_model=ApplyResponse)
-def apply_to_job(
-    request: ApplyRequest,
+@limiter.limit("20/hour")
+async def apply_to_job(
+    request: Request,
+    apply_request: ApplyRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    job_service: JobService = Depends(get_job_service),
 ):
-    logger.info(f"[API] Applying to job: {request.linkedin_url}")
-
-    user_repo = UserRepository(db)
-    settings_repo = SettingsRepository(db)
-    provider_repo = ProviderRepository(db)
-    application_repo = ApplicationRepository(db)
-
-    job_service = JobService(
-        user_repo=user_repo,
-        settings_repo=settings_repo,
-        provider_repo=provider_repo,
-        application_repo=application_repo
+    logger.info(
+        "[API] Apply: url=%s text=%s",
+        apply_request.linkedin_url,
+        f"{len(apply_request.job_post_text)} chars" if apply_request.job_post_text else "none",
     )
 
-    try:
-        resume_path = request.resume_path
-        if not resume_path:
-            resume_path = settings_repo.get_resume_path(current_user.id)
+    # prepare/persist stay off the event loop: both hit a sync Session, and
+    # prepare may drive Playwright's sync API, which refuses to run in a
+    # thread that has a running loop.
+    ctx = await run_in_threadpool(
+        job_service.prepare_apply,
+        current_user.id,
+        apply_request.linkedin_url,
+        apply_request.job_post_text,
+        apply_request.resume_id,
+        apply_request.to_email,
+    )
 
-        result = job_service.apply_to_job(
-            user_id=current_user.id,
-            linkedin_url=request.linkedin_url,
-            resume_path=resume_path if resume_path and Path(resume_path).exists() else None,
-            to_email=request.to_email,
-            provider=request.provider,
-            model=request.model,
-            api_key=request.api_key
-        )
+    result = await job_service.generate_application(ctx, get_model_clients())
 
-        return ApplyResponse(**result)
-
-    except ValueError as e:
-        logger.error(f"[API] Apply validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"[API] Apply failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    payload = await run_in_threadpool(job_service.persist_application, ctx, result)
+    return ApplyResponse(**payload)
 
 
 @router.post("/send")
+@limiter.limit("20/hour")
 def send_job_email(
-    request: SendRequest,
+    request: Request,
+    send_request: SendRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    job_service: JobService = Depends(get_job_service),
 ):
-    logger.info(f"[API] Sending email to: {request.to_email}")
+    logger.info(f"[API] Sending email to: {send_request.to_email}")
 
-    user_repo = UserRepository(db)
-    user = user_repo.get_by_id(current_user.id)
-
-    if not user.email_config or not user.email_config.get("type"):
-        logger.error(f"[API] No email config for user {current_user.id}")
-        raise HTTPException(
-            status_code=401,
-            detail="Email not configured. Please configure email settings first."
-        )
-
-    user_repo = UserRepository(db)
-    settings_repo = SettingsRepository(db)
-    provider_repo = ProviderRepository(db)
-    application_repo = ApplicationRepository(db)
-
-    job_service = JobService(
-        user_repo=user_repo,
-        settings_repo=settings_repo,
-        provider_repo=provider_repo,
-        application_repo=application_repo
-    )
+    resume = job_service.resolve_resume(current_user.id, send_request.resume_id)
+    if send_request.resume_id is not None and resume is None:
+        raise NotFoundError("Resume not found")
 
     try:
         result = job_service.send_job_email(
             user_id=current_user.id,
-            to_email=request.to_email,
-            subject=request.subject,
-            body=request.body,
-            resume_path=request.resume_path,
-            application_id=request.application_id
+            to_email=send_request.to_email,
+            subject=send_request.subject,
+            body=send_request.body,
+            resume=resume,
+            application_id=send_request.application_id,
         )
-        logger.info(f"[API] Email sent successfully to {request.to_email}")
+        logger.info(f"[API] Email sent successfully to {send_request.to_email}")
         return result
-    except Exception as e:
-        logger.error(f"[API] Failed to send email: {e}")
-        
-        # Update application status to failed if application_id provided
-        if request.application_id:
-            application_repo.update_status(
-                request.application_id,
+    except ValueError as exc:
+        raise UnprocessableEntityError(str(exc)) from exc
+    except Exception:
+        logger.exception("[API] Failed to send email")
+        if send_request.application_id:
+            job_service.application_repo.update_status(
+                send_request.application_id,
                 status="failed",
-                error_message=str(e)
+                error_message="Email sending failed",
             )
-        
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+        raise

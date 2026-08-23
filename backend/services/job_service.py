@@ -1,20 +1,49 @@
+"""Orchestrates one job application.
+
+Split three ways so the async boundary is explicit:
+
+  prepare_apply       sync   DB reads + scraping (both blocking)
+  generate_application async LLM only, no DB, no blocking I/O
+  persist_application sync   DB writes
+
+The route runs the sync halves in a threadpool and awaits the middle. That
+matters for more than tidiness: linkedin_parser drives Playwright's sync API,
+which raises if called from a thread with a running event loop.
+"""
+from __future__ import annotations
+
 import logging
-import re
+from dataclasses import dataclass
 from typing import Optional
 
-from services.ai_service import LLMService, ResumeParser, EmailGenerator
-from services.email_service import EmailService
-from utils.linkedin_parser import fetch_linkedin_post
-from utils.resume_handler import extract_text_from_pdf
-from utils.email_extractor import extract_email as regex_extract_email
-from utils.logger import logger
-from repositories.user_repo import UserRepository
-from repositories.settings_repo import SettingsRepository
-from repositories.provider_repo import ProviderRepository
+from core.llm import ModelClients
+from db.models import UserResume
 from repositories.application_repo import ApplicationRepository
-from models.domain import JobData, ResumeData, EmailContent
+from repositories.resume_repo import ResumeRepository
+from repositories.settings_repo import SettingsRepository
+from repositories.user_repo import UserRepository
+from core.errors import NoRecipientFound, ResumeTextUnavailable
+from services.agents.pipeline import ApplyPipelineInput, run_apply_pipeline
+from services.agents.schemas import ApplyPipelineResult
+from services.email_service import EmailService
+from services.job_post_source import PostSource, resolve_job_post_text
+from utils.resume_handler import extract_text_from_pdf
 
 logger = logging.getLogger("job-applier")
+
+
+@dataclass
+class ApplyContext:
+    """Everything the LLM step needs, resolved. No paths, no URLs to fetch."""
+
+    user_id: int
+    linkedin_url: Optional[str]
+    job_post_text: str
+    post_source: PostSource
+    resume_text: Optional[str]
+    resume_id: Optional[int]
+    to_email: Optional[str]
+    candidate_name_hint: Optional[str]
 
 
 class JobService:
@@ -22,97 +51,153 @@ class JobService:
         self,
         user_repo: UserRepository,
         settings_repo: SettingsRepository,
-        provider_repo: ProviderRepository,
-        application_repo: ApplicationRepository = None
+        application_repo: ApplicationRepository = None,
+        resume_repo: ResumeRepository = None,
     ):
         self.user_repo = user_repo
         self.settings_repo = settings_repo
-        self.provider_repo = provider_repo
         self.application_repo = application_repo
+        self.resume_repo = resume_repo
 
-    def _get_provider_config(self, user_id: int, provider: str) -> tuple[Optional[str], Optional[str]]:
-        config = self.provider_repo.get_config(user_id, provider)
-        if not config:
-            return None, None
-        api_key = config.config.get("api_key", "") if config.config else ""
-        base_url = config.config.get("url", "") if config.config else ""
-        return api_key, base_url
+    # ------------------------------------------------------------------ sync
 
-    def get_job_data(self, linkedin_url: str) -> JobData:
-        logger.info(f"[Job] Fetching LinkedIn post: {linkedin_url}")
-        data = fetch_linkedin_post(linkedin_url)
-        return JobData(
-            url=data.get('url', linkedin_url),
-            title=data.get('title', ''),
-            company=data.get('company', ''),
-            location=data.get('location', ''),
-            description=data.get('description', ''),
-            raw_html=data.get('raw_html', '')
-        )
+    def resolve_resume(self, user_id: int, resume_id: Optional[int]) -> Optional[UserResume]:
+        """Resolve a resume the caller is actually allowed to use.
 
-    def parse_resume(self, resume_path: str, provider: str, model: str, api_key: str = None) -> ResumeData:
-        logger.info(f"[Job] Parsing resume: {resume_path}")
+        The client used to send a filesystem path that the server read without
+        any ownership check, so any readable file could be emailed out. It now
+        sends an id and the repository scopes the lookup to the user.
+        """
+        if not self.resume_repo:
+            return None
+        if resume_id is not None:
+            return self.resume_repo.get_by_id(resume_id, user_id)
+        return self.resume_repo.get_default(user_id)
 
-        llm = LLMService(provider=provider, model=model, api_key=api_key)
-        parser = ResumeParser(llm)
+    def resume_text_for(self, resume: Optional[UserResume]) -> Optional[str]:
+        if resume is None:
+            return None
+        if resume.resume_text:
+            return resume.resume_text
+        # Uploaded before extraction moved to upload time. Backfill once.
+        logger.info("[Resume] backfilling text for resume %s", resume.id)
+        text = extract_text_from_pdf(resume.file_path)
+        self.resume_repo.set_text(resume, text)
+        return text
 
-        resume_text = extract_text_from_pdf(resume_path)
-        parsed = parser.parse(resume_text)
-
-        return ResumeData(
-            name=parsed.get('name', ''),
-            email=parsed.get('email', ''),
-            phone=parsed.get('phone', ''),
-            location=parsed.get('location', ''),
-            summary=parsed.get('summary', ''),
-            total_experience_years=parsed.get('total_experience_years', '0'),
-            skills=parsed.get('skills', []),
-            education=parsed.get('education', []),
-            experience=parsed.get('experience', []),
-            key_achievements=parsed.get('key_achievements', []),
-            certifications=parsed.get('certifications', []),
-            languages=parsed.get('languages', [])
-        )
-
-    def generate_email(
+    def prepare_apply(
         self,
-        job_data: JobData,
-        resume_data: ResumeData = None,
-        candidate_name: str = None,
-        provider: str = None,
-        model: str = None,
-        api_key: str = None
-    ) -> EmailContent:
-        logger.info(f"[Job] Generating email with {provider}/{model}")
+        user_id: int,
+        linkedin_url: Optional[str],
+        job_post_text: Optional[str],
+        resume_id: Optional[int],
+        to_email: Optional[str],
+    ) -> ApplyContext:
+        post_text, source = resolve_job_post_text(linkedin_url, job_post_text)
 
-        llm = LLMService(provider=provider, model=model, api_key=api_key)
-        generator = EmailGenerator(llm)
+        resume = self.resolve_resume(user_id, resume_id)
+        if resume_id is not None and resume is None:
+            raise ResumeTextUnavailable("That resume does not exist.")
 
-        result = generator.generate(
-            job_data={
-                'url': job_data.url,
-                'title': job_data.title,
-                'company': job_data.company,
-                'location': job_data.location,
-                'description': job_data.description
-            },
-            resume_data={
-                'name': resume_data.name if resume_data else None,
-                'skills': resume_data.skills if resume_data else [],
-                'total_experience_years': resume_data.total_experience_years if resume_data else '0',
-                'experience': resume_data.experience if resume_data else [],
-                'education': resume_data.education if resume_data else [],
-                'key_achievements': resume_data.key_achievements if resume_data else [],
-                'certifications': resume_data.certifications if resume_data else []
-            } if resume_data else None,
-            candidate_name=candidate_name
+        resume_text = self.resume_text_for(resume)
+        user = self.user_repo.get_by_id(user_id)
+
+        return ApplyContext(
+            user_id=user_id,
+            linkedin_url=linkedin_url,
+            job_post_text=post_text,
+            post_source=source,
+            resume_text=resume_text,
+            resume_id=resume.id if resume else None,
+            to_email=to_email,
+            candidate_name_hint=user.name if user else None,
         )
 
-        return EmailContent(
-            subject=result['subject'],
-            body=result['body'],
-            email=result['email']
+    # ----------------------------------------------------------------- async
+
+    async def generate_application(
+        self, ctx: ApplyContext, clients: ModelClients
+    ) -> ApplyPipelineResult:
+        return await run_apply_pipeline(
+            ApplyPipelineInput(
+                job_post_text=ctx.job_post_text,
+                resume_text=ctx.resume_text,
+                job_post_url=ctx.linkedin_url,
+                candidate_name_hint=ctx.candidate_name_hint,
+            ),
+            clients,
         )
+
+    # ------------------------------------------------------------------ sync
+
+    def persist_application(self, ctx: ApplyContext, result: ApplyPipelineResult) -> dict:
+        recipient = result.recipient_email or ctx.to_email
+        if not recipient:
+            raise NoRecipientFound(
+                "No email address found in the post. Provide a recipient address."
+            )
+
+        job = result.job
+        fit = result.fit
+        match_json = {
+            "required_skills": job.required_skills,
+            "seniority_level": job.seniority_level,
+            "matching_skills": fit.matching_skills if fit else [],
+            "skill_gaps": fit.skill_gaps if fit else [],
+            "key_achievements": fit.key_achievements if fit else [],
+            "unresolved_issues": result.unresolved_issues,
+            "post_source": ctx.post_source,
+        }
+        total_exp = f"{fit.total_experience_years:g}" if fit else "0"
+
+        application = None
+        if self.application_repo:
+            fields = dict(
+                title=job.title,
+                company=job.company,
+                location=job.location,
+                description=job.description,
+                sent_to_email=recipient,
+                subject=result.email.subject,
+                body=result.email.body_html,
+                total_experience_years=total_exp,
+                match_json=match_json,
+            )
+            existing = (
+                self.application_repo.get_by_url(ctx.user_id, ctx.linkedin_url)
+                if ctx.linkedin_url
+                else None
+            )
+            if existing and existing.status != "sent":
+                application = self.application_repo.update_status(
+                    existing.id, status="generated", **fields
+                )
+            else:
+                # No prior application, or the last one was already sent and
+                # this is a re-apply: either way, a new row.
+                application = self.application_repo.create(
+                    user_id=ctx.user_id,
+                    linkedin_url=ctx.linkedin_url or "",
+                    status="generated",
+                    resume_path=None,
+                    **fields,
+                )
+
+        payload = {
+            "title": job.title,
+            "company": job.company,
+            "location": job.location,
+            "description": job.description[:500],
+            "email": recipient,
+            "subject": result.email.subject,
+            "body": result.email.body_html,
+            "status": "generated",
+            "total_experience_years": total_exp,
+            "resume_id": ctx.resume_id,
+        }
+        if application:
+            payload["application_id"] = application.id
+        return payload
 
     def send_job_email(
         self,
@@ -120,8 +205,8 @@ class JobService:
         to_email: str,
         subject: str,
         body: str,
-        resume_path: str = None,
-        application_id: int = None
+        resume: Optional[UserResume] = None,
+        application_id: int = None,
     ) -> dict:
         user = self.user_repo.get_by_id(user_id)
 
@@ -130,129 +215,21 @@ class JobService:
 
         email_service = EmailService(email_config=user.email_config)
 
+        # The one place the PDF on disk is still needed: the MIME attachment.
         result = email_service.send(
             to_email=to_email,
             subject=subject,
             body=body,
-            resume_path=resume_path
+            resume_path=resume.file_path if resume else None,
         )
 
-        # Update application status if application_repo is available
         if self.application_repo and application_id:
             self.application_repo.update_status(
                 application_id=application_id,
                 status="sent",
                 sent_to_email=to_email,
                 subject=subject,
-                body=body
+                body=body,
             )
-
-        return result
-
-    def apply_to_job(
-        self,
-        user_id: int,
-        linkedin_url: str,
-        resume_path: str = None,
-        to_email: str = None,
-        provider: str = None,
-        model: str = None,
-        api_key: str = None
-    ) -> dict:
-        provider, model = provider or "", model or ""
-
-        if not provider or not model:
-            provider, model = self.provider_repo.get_default_provider_and_model(user_id)
-
-        if not provider or not model:
-            raise ValueError("Please configure AI provider and model in Settings first.")
-
-        config_api_key, config_base_url = self._get_provider_config(user_id, provider)
-        api_key = api_key or config_api_key
-
-        job_data = self.get_job_data(linkedin_url)
-
-        resume_data = None
-        candidate_name = ""
-        if resume_path:
-            try:
-                resume_data = self.parse_resume(resume_path, provider, model, api_key)
-                candidate_name = resume_data.name
-            except Exception as e:
-                logger.warning(f"[Job] Resume parsing failed: {e}")
-
-        email_content = self.generate_email(
-            job_data=job_data,
-            resume_data=resume_data,
-            candidate_name=candidate_name,
-            provider=provider,
-            model=model,
-            api_key=api_key
-        )
-
-        email = email_content.email or to_email
-        if not email:
-            email = regex_extract_email(f"{job_data.title} {job_data.company} {job_data.description}")
-
-        if not email:
-            raise ValueError("No email found in LinkedIn post and no recipient provided.")
-
-        total_exp = resume_data.total_experience_years if resume_data else "0"
-
-        # Save application to database if application_repo is available
-        application = None
-        if self.application_repo:
-            # Check if application already exists for this URL
-            existing = self.application_repo.get_by_url(user_id, linkedin_url)
-            if existing and existing.status == 'sent':
-                # Create new application for re-apply
-                application = self.application_repo.create(
-                    user_id=user_id,
-                    linkedin_url=linkedin_url,
-                    title=job_data.title,
-                    company=job_data.company,
-                    location=job_data.location,
-                    description=job_data.description[:1000] if job_data.description else None,
-                    resume_path=resume_path,
-                    total_experience_years=total_exp,
-                    status="generated"
-                )
-            elif not existing:
-                # Create new application
-                application = self.application_repo.create(
-                    user_id=user_id,
-                    linkedin_url=linkedin_url,
-                    title=job_data.title,
-                    company=job_data.company,
-                    location=job_data.location,
-                    description=job_data.description[:1000] if job_data.description else None,
-                    resume_path=resume_path,
-                    total_experience_years=total_exp,
-                    status="generated"
-                )
-            else:
-                # Update existing application
-                application = self.application_repo.update_status(
-                    existing.id,
-                    status="generated",
-                    subject=email_content.subject,
-                    body=email_content.body
-                )
-
-        result = {
-            'title': job_data.title,
-            'company': job_data.company,
-            'location': job_data.location,
-            'description': job_data.description[:500],
-            'email': email,
-            'subject': email_content.subject,
-            'body': email_content.body,
-            'status': 'generated',
-            'total_experience_years': total_exp
-        }
-
-        # Include application ID in result
-        if application:
-            result['application_id'] = application.id
 
         return result

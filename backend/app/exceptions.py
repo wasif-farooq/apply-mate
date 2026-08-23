@@ -39,16 +39,8 @@ class ConflictError(AppException):
 class EmailNotFoundError(AppException):
     def __init__(self):
         super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="No email found in LinkedIn post. Please provide a recipient email."
-        )
-
-
-class ProviderNotConfiguredError(AppException):
-    def __init__(self, provider: str):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"AI provider '{provider}' is not configured. Please set up your API key in Settings."
         )
 
 
@@ -57,3 +49,25 @@ class GmailNotConnectedError(AuthenticationError):
         super().__init__(
             detail="Gmail not connected. Please log in again to authorize email sending."
         )
+
+
+class UnprocessableEntityError(AppException):
+    def __init__(self, detail: str = "Could not process the request content"):
+        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+
+
+class RateLimitedError(AppException):
+    def __init__(self, detail: str = "Service is busy. Try again shortly.", retry_after: int = 30):
+        super().__init__(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
+        self.headers = {"Retry-After": str(retry_after)}
+
+
+class UpstreamResponseError(AppException):
+    def __init__(self, detail: str = "Upstream service returned an unusable response"):
+        super().__init__(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+
+
+class ServiceUnavailableError(AppException):
+    def __init__(self, detail: str = "Service temporarily unavailable", retry_after: int = 30):
+        super().__init__(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=detail)
+        self.headers = {"Retry-After": str(retry_after)}
