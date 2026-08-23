@@ -6,6 +6,6 @@ from pathlib import Path
 # anything under backend/ is imported.
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test")
 os.environ.setdefault("JWT_SECRET", "test-secret-not-used-for-real-tokens")
-os.environ.setdefault("DASHSCOPE_API_KEY", "sk-test")
+os.environ.setdefault("AI_API_KEY", "sk-test")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

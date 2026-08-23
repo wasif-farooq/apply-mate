@@ -1,9 +1,11 @@
 """The one model client.
 
-There is exactly one provider (Alibaba DashScope, OpenAI-compatible) and one
-model, chosen by env. No per-user keys, no provider switch, no runtime model
-selection -- if you are looking for where the user picks a model, it was
-deliberately deleted.
+There is exactly one provider and one model, both from env. No per-user keys,
+no provider switch, no runtime model selection -- if you are looking for where
+the user picks a model, it was deliberately deleted.
+
+The provider only has to be OpenAI-compatible; swapping it is AI_BASE_URL,
+AI_MODEL and AI_API_KEY, with no code change.
 
 Two clients are built rather than one because AssistantAgent exposes no
 per-call create args, so temperature has to be baked into the client.
@@ -41,18 +43,22 @@ logger = logging.getLogger("job-applier")
 settings = get_settings()
 
 
-# Qwen is not in AutoGen's model registry, so every field has to be supplied.
+# The models we point at are not in AutoGen's registry, so every field has to
+# be supplied by hand.
 #
 # structured_output=False is the load-bearing one: it makes AutoGen reject a
-# Pydantic output type up front with a clear error instead of letting DashScope
-# 400 on a json_schema request the flash tier does not support. Flip it to True
-# only together with AI_STRUCTURED_MODE=json_schema and a plus/max model.
+# Pydantic output type up front with a clear error, instead of letting the
+# provider 400 on a json_schema request it does not support. Flip it to True
+# only together with AI_STRUCTURED_MODE=json_schema and a model known to
+# support strict schemas.
 #
-# family stays UNKNOWN on purpose. Setting it to R1 makes AutoGen strip
-# <think>...</think> out of content into .thought -- keep that in your back
-# pocket if the model ever leaks reasoning into the response body and breaks
-# JSON parsing, but do not enable it speculatively.
-QWEN_MODEL_INFO: ModelInfo = {
+# family stays UNKNOWN even though the default model is a DeepSeek. Setting it
+# to R1 makes AutoGen strip <think>...</think> out of content into .thought,
+# which sounds right for a reasoning model -- but structured._extract_json_block
+# already skips a reasoning preamble before the first brace (there is a test
+# for exactly that), and UNKNOWN keeps this correct for non-reasoning models
+# too. Switch to R1 only if a real response is observed to break parsing.
+MODEL_INFO: ModelInfo = {
     "vision": False,
     "function_calling": True,
     "json_output": True,
@@ -71,22 +77,26 @@ class ModelClients:
 
 
 def _build_client(temperature: float) -> ChatCompletionClient:
-    model_info = dict(QWEN_MODEL_INFO)
+    model_info = dict(MODEL_INFO)
     create_args: dict = {}
 
     if settings.AI_STRUCTURED_MODE == "json_schema":
         model_info["structured_output"] = True
-    else:
-        # DashScope refuses this unless the literal word "json" appears
-        # somewhere in the messages -- prompts.json_contract() guarantees it.
+    elif settings.AI_STRUCTURED_MODE == "json_object":
+        # Some providers (DashScope among them) refuse this unless the literal
+        # word "json" appears in the messages -- prompts.json_contract()
+        # guarantees it.
         create_args["response_format"] = {"type": "json_object"}
+    # "prompt" mode sends no extra parameters at all. The schema is in the
+    # system message and structured.py validates the reply, so this works
+    # against a provider whose parameter support we have not verified.
 
     # Note: never pass max_tokens. In JSON mode a truncated response is
     # invalid JSON rather than a short answer.
     return OpenAIChatCompletionClient(
         model=settings.AI_MODEL,
-        api_key=settings.DASHSCOPE_API_KEY,
-        base_url=settings.DASHSCOPE_BASE_URL,
+        api_key=settings.AI_API_KEY,
+        base_url=settings.AI_BASE_URL,
         model_info=model_info,
         temperature=temperature,
         timeout=settings.AI_TIMEOUT_SECONDS,
@@ -118,7 +128,7 @@ def init_model_clients() -> None:
         "[LLM] clients ready: model=%s mode=%s base_url=%s",
         settings.AI_MODEL,
         settings.AI_STRUCTURED_MODE,
-        settings.DASHSCOPE_BASE_URL,
+        settings.AI_BASE_URL,
     )
 
 
@@ -140,7 +150,7 @@ def get_model_clients() -> ModelClients:
     return _clients
 
 
-# DashScope error codes, as returned in body["error"]["code"]. Anything not
+# Provider error codes, as returned in body["error"]["code"]. Anything not
 # listed falls through to LLMRateLimited, which is the safe default because it
 # is the only retryable branch -- an unknown code is more likely a transient
 # throttle than a permanent billing failure.
@@ -198,8 +208,8 @@ def classify_openai_error(exc: Exception) -> LLMError:
         return LLMUpstreamError(str(exc))
 
     if isinstance(exc, BadRequestError):
-        # A 400 from DashScope means we sent something wrong. It is never the
-        # end user's fault and must not become an HTTP 400.
+        # A 400 from the provider means we sent something wrong. It is never
+        # the end user's fault and must not become an HTTP 400.
         text = str(exc).lower()
         if "model" in text or "response_format" in text:
             return LLMModelUnavailable(str(exc))

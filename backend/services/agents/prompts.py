@@ -83,7 +83,10 @@ Check:
 2. Skills: does it map real resume skills onto the job's requirements?
 3. Achievements: are quantified achievements present, with their numbers?
 4. Honesty: does it claim any skill listed in skill_gaps, or any experience the \
-fit analysis does not support? If so, that is an automatic rejection.
+fit analysis does not support? If so, that is an automatic rejection. When the \
+fit analysis is null, NOTHING about the candidate is known -- any stated years \
+of experience, any claimed familiarity with a technology, and any achievement \
+is fabricated and must be rejected.
 5. Format: valid HTML with <p> tags, no markdown, no emoji.
 6. Length: 150-200 words.
 7. Opening: starts with "Dear Hiring Manager,".
@@ -120,9 +123,16 @@ def draft_prompt(job: BaseModel, fit: BaseModel | None, candidate_name: str) -> 
     if fit is None:
         return (
             f"Job analysis:\n{job.model_dump_json(indent=2)}\n\n"
-            "No resume was provided. Write a concise general application email that "
-            "expresses interest in the role without claiming any specific experience, "
-            f"and sign it as {candidate_name}."
+            "NO RESUME WAS PROVIDED. You therefore know nothing about this "
+            "candidate's background.\n"
+            "- Do NOT state any number of years of experience.\n"
+            "- Do NOT claim familiarity with any technology in required_skills.\n"
+            "- Do NOT invent achievements, employers, or projects.\n"
+            "Write a short email expressing interest in the role and asking to "
+            "share details, and nothing more. Restating the job's own "
+            "requirements as if they were the candidate's experience is the "
+            "failure mode to avoid.\n"
+            f"Sign it as {candidate_name}."
         )
     return (
         f"Job analysis:\n{job.model_dump_json(indent=2)}\n\n"
