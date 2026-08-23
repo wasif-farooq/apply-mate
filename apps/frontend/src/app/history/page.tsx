@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { useApplications } from '@/hooks/useApplications'
 import { Header } from '@applybuddy/ui'
-import { useAuth } from '@/lib/auth'
+import { Navigation } from '@/components/Navigation'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 function StatsGrid({ stats }: { stats: { total: number; sent: number; generated: number; failed: number } | null }) {
   if (!stats) return null
@@ -217,8 +217,6 @@ function ApplicationList({
 }
 
 export default function HistoryPage() {
-  const { user, loading: authLoading } = useAuthGuard()
-  const { signOut } = useAuth()
   
   const {
     applications,
@@ -232,55 +230,21 @@ export default function HistoryPage() {
     formatDate,
   } = useApplications()
 
-  if (authLoading || loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#001e2b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-        <p>Loading...</p>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#001e2b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-        <p>Please sign in to access this page.</p>
-      </div>
-    )
-  }
+  const navItems = [
+    { href: '/apply', label: 'Apply' },
+    { href: '/history', label: 'History' },
+    { href: '/settings', label: 'Settings' },
+    { href: '/resumes', label: 'Resumes' },
+  ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#001e2b', color: '#ffffff' }}>
-      <Header 
-        logo="ApplyBuddy"
-        showLogoIcon={true}
-        rightElement={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <Link href="/apply" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Apply</Link>
-              <Link href="/history" style={{ color: '#00ed64', textDecoration: 'none', fontSize: '14px' }}>History</Link>
-              <Link href="/settings" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
-              <Link href="/resumes" style={{ color: '#a8b3bc', textDecoration: 'none', fontSize: '14px' }}>Resumes</Link>
-            </div>
-            <button
-              onClick={signOut}
-              style={{
-                background: 'transparent',
-                border: '1px solid #ff6b6b',
-                color: '#ff6b6b',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                minWidth: 'auto',
-                minHeight: 'auto',
-              }}
-            >
-              <span className="hide-mobile">Sign Out</span>
-              <span className="hide-desktop">✕</span>
-            </button>
-          </div>
-        }
-      />
+    <ProtectedRoute>
+      <div style={{ minHeight: '100vh', background: '#001e2b', color: '#ffffff' }}>
+        <Header 
+          logo="ApplyBuddy"
+          showLogoIcon={true}
+          rightElement={<Navigation items={navItems} activeHref="/history" />}
+        />
 
       <StatsGrid stats={stats} />
 
@@ -298,5 +262,6 @@ export default function HistoryPage() {
         />
       </div>
     </div>
+    </ProtectedRoute>
   )
 }

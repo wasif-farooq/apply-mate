@@ -1,4 +1,4 @@
-import type { ApplyRequest, ApplyResponse, SendRequest, Settings, EmailConfig, EmailConfigSave, SmtpTestRequest } from './types'
+import type { ApplyRequest, ApplyResponse, SendRequest, EmailConfig, EmailConfigSave, SmtpTestRequest } from './types'
 
 export class ApiClient {
   private baseUrl: string
@@ -57,11 +57,7 @@ export class ApiClient {
     })
   }
 
-  async getSettings(): Promise<Settings> {
-    return this.request<Settings>('/api/settings')
-  }
-
-  async uploadResume(file: File): Promise<{ path: string; filename: string }> {
+  async uploadResume(file: File): Promise<{ path: string; filename: string; resume_id: number }> {
     const formData = new FormData()
     formData.append('file', file)
 

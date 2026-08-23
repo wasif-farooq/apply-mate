@@ -134,7 +134,7 @@ export default function Terms() {
               9. Third-Party Services
             </h2>
             <p>
-              ApplyBuddy uses third-party AI providers (including but not limited to OpenAI, Anthropic, Google AI) to generate email content. When you use these services, your job application data may be processed by these providers in accordance with their privacy policies.
+              ApplyBuddy uses Alibaba Cloud Model Studio (DashScope) to generate email content. When you use these services, your job application data may be processed by that provider in accordance with its privacy policy.
             </p>
           </section>
 

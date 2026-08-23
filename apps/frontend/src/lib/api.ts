@@ -63,11 +63,15 @@ export interface ApplyResponse {
   body: string
   status: string
   application_id?: number
+  resume_id?: number
+  total_experience_years?: string
 }
 
 export interface ApplyRequest {
-  linkedin_url: string
-  resume_path?: string
+  linkedin_url?: string
+  /** Post text captured from the page by the extension. Skips server scraping. */
+  job_post_text?: string
+  resume_id?: number
   to_email?: string
 }
 
@@ -75,7 +79,7 @@ export interface SendRequest {
   to_email: string
   subject: string
   body: string
-  resume_path?: string
+  resume_id?: number
   application_id?: number
 }
 
@@ -115,71 +119,6 @@ export interface ApplicationStats {
   failed: number
 }
 
-export interface Settings {
-  providers: ProviderConfig[]
-  models: Record<string, ModelConfig[]>
-  selected_model: string | null
-  selected_provider: string | null
-}
-
-export interface ProviderConfig {
-  provider: string
-  enabled: boolean
-  config: {
-    url?: string
-    api_key?: string
-  }
-}
-
-export interface ModelConfig {
-  model_name: string
-  is_default: boolean
-}
-
-export async function getSettings(): Promise<Settings> {
-  const response = await fetchWithAuth(`${API_BASE}/api/settings`, {
-    headers: getHeaders()
-  })
-  if (!response.ok) {
-    throw new Error('Failed to get settings')
-  }
-  return response.json()
-}
-
-export async function updateProviderConfig(provider: string, enabled: boolean, config: Record<string, string>): Promise<ProviderConfig> {
-  const response = await fetchWithAuth(`${API_BASE}/api/settings/providers/${provider}`, {
-    method: 'PUT',
-    headers: getHeaders(),
-    body: JSON.stringify({ enabled, config })
-  })
-  if (!response.ok) {
-    throw new Error('Failed to update provider config')
-  }
-  return response.json()
-}
-
-export async function updateProviderModels(provider: string, models: { model_name: string; is_default: boolean }[]): Promise<void> {
-  const response = await fetchWithAuth(`${API_BASE}/api/settings/models/${provider}`, {
-    method: 'PUT',
-    headers: getHeaders(),
-    body: JSON.stringify({ models })
-  })
-  if (!response.ok) {
-    throw new Error('Failed to update provider models')
-  }
-}
-
-export async function updateGlobalSelection(provider: string, model: string): Promise<void> {
-  const response = await fetchWithAuth(`${API_BASE}/api/settings/selection`, {
-    method: 'PUT',
-    headers: getHeaders(),
-    body: JSON.stringify({ provider, model })
-  })
-  if (!response.ok) {
-    throw new Error('Failed to update global selection')
-  }
-}
-
 export async function applyToJob(data: ApplyRequest): Promise<ApplyResponse> {
   const response = await fetchWithAuth(`${API_BASE}/api/apply`, {
     method: 'POST',
@@ -210,7 +149,7 @@ export async function sendEmail(data: SendRequest): Promise<{ status: string; me
   return response.json()
 }
 
-export async function uploadResume(file: File): Promise<{ status: string; path: string; filename: string }> {
+export async function uploadResume(file: File): Promise<{ status: string; path: string; filename: string; resume_id: number; char_count: number }> {
   const token = getToken()
   const formData = new FormData()
   formData.append('file', file)
